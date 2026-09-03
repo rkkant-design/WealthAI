@@ -1,0 +1,7 @@
+{
+  "name": "WealthPilot AI",
+  "description": "Your Personal NSE India Investment Intelligence Agent. Understand the market, invest with conviction, and build long-term wealth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

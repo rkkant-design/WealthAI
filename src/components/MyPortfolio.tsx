@@ -12,7 +12,11 @@ import {
   Layers,
   PieChart as PieIcon,
   Info,
-  Download
+  Download,
+  Sparkles,
+  RotateCcw,
+  Search,
+  Compass
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -32,7 +36,11 @@ export const MyPortfolio: React.FC = () => {
     openReviewModal, 
     setSelectedStockSymbol,
     stocks,
-    investorProfile
+    investorProfile,
+    user,
+    clearPortfolioToCleanSlate,
+    loadDemoPortfolio,
+    setActiveTab
   } = useWealth();
 
   // Sector breakdown data for Pie Chart
@@ -96,6 +104,32 @@ export const MyPortfolio: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+          {portfolio.length > 0 ? (
+            <button
+              id="portfolio-reset-clean-slate-btn"
+              onClick={() => {
+                if (window.confirm('Reset your portfolio to a clean slate (0 holdings)? This will clear all current holdings so you can start completely fresh.')) {
+                  clearPortfolioToCleanSlate();
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-amber-300 hover:text-amber-200 font-bold text-xs border border-slate-700 transition-all"
+              title="Clear all holdings and start fresh"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-amber-400" />
+              <span>Reset Clean Slate</span>
+            </button>
+          ) : (
+            <button
+              id="portfolio-load-demo-btn"
+              onClick={() => loadDemoPortfolio()}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-blue-300 hover:text-blue-200 font-bold text-xs border border-slate-700 transition-all"
+              title="Load sample Indian bluechip holdings for reference"
+            >
+              <Compass className="h-3.5 w-3.5 text-blue-400" />
+              <span>Load Sample Bluechips</span>
+            </button>
+          )}
+
           <button
             id="portfolio-export-csv-btn"
             onClick={handleExportCSV}
@@ -165,7 +199,89 @@ export const MyPortfolio: React.FC = () => {
         </div>
       </div>
 
-      {/* Stocks That Need Attention Banner (Section 30) */}
+      {/* Clean Slate View if Portfolio is Empty */}
+      {portfolio.length === 0 ? (
+        <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 shadow-2xl text-center space-y-6">
+          <div className="inline-flex items-center justify-center p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mx-auto">
+            <Sparkles className="h-8 w-8 animate-pulse text-emerald-400" />
+          </div>
+
+          <div className="max-w-xl mx-auto space-y-2">
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Clean Slate Portfolio Initialized
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Logged in as <span className="font-mono text-emerald-400 font-bold">{user?.email || 'rkkant@gmail.com'}</span>. You have zero holdings recorded so you can start completely fresh with your real investments.
+            </p>
+          </div>
+
+          {/* 3 Step Quick Start Guide */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto text-left pt-2">
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 space-y-2">
+              <div className="h-7 w-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">
+                1
+              </div>
+              <h3 className="text-xs font-bold text-white">Record Real Holdings</h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Add any stock with your buy price, quantity, purchase date, and fundamental thesis.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 space-y-2">
+              <div className="h-7 w-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                2
+              </div>
+              <h3 className="text-xs font-bold text-white">Continuous Moat Audits</h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                AI tracks real-time NSE prices, 9-factor valuations, and quarterly earnings milestones.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 space-y-2">
+              <div className="h-7 w-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                3
+              </div>
+              <h3 className="text-xs font-bold text-white">Thesis Discipline</h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Receive proactive thesis weakening warnings to avoid panic selling or overconcentration.
+              </p>
+            </div>
+          </div>
+
+          {/* Action CTAs */}
+          <div className="flex items-center justify-center gap-3 flex-wrap pt-3">
+            <button
+              id="clean-slate-record-first-btn"
+              onClick={() => setIsAddInvestmentOpen(true)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all hover:scale-105"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>+ Record First Investment</span>
+            </button>
+
+            <button
+              id="clean-slate-search-analyzer-btn"
+              onClick={() => setActiveTab('analyzer')}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white font-bold text-xs border border-slate-700 transition-all"
+            >
+              <Search className="h-4 w-4 text-blue-400" />
+              <span>Search & Analyze Indian Equities</span>
+            </button>
+
+            <button
+              id="clean-slate-load-sample-btn"
+              onClick={() => loadDemoPortfolio()}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs border border-slate-800 transition-all"
+              title="Preview with sample Indian equities"
+            >
+              <Compass className="h-4 w-4 text-slate-400" />
+              <span>Load Sample Demo Portfolio</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Stocks That Need Attention Banner (Section 30) */}
       {attentionHoldings.length > 0 && (
         <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-rose-950/40 via-slate-900 to-rose-950/30 border border-rose-500/40 shadow-xl space-y-3">
           <div className="flex items-center justify-between border-b border-rose-900/40 pb-2.5">
@@ -447,6 +563,8 @@ export const MyPortfolio: React.FC = () => {
           </table>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

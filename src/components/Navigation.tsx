@@ -16,7 +16,8 @@ import {
   Cpu, 
   ShieldAlert, 
   ArrowUpRight,
-  ChevronRight
+  ChevronRight,
+  LogOut
 } from 'lucide-react';
 import { useWealth } from '../context/WealthContext';
 
@@ -26,7 +27,7 @@ interface NavigationProps {
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ isMobileOpen, setIsMobileOpen }) => {
-  const { activeTab, setActiveTab, unreadAlertCount, investorProfile, portfolioStats } = useWealth();
+  const { activeTab, setActiveTab, unreadAlertCount, investorProfile, portfolioStats, user, logout } = useWealth();
 
   const navItems = [
     { id: 'dashboard', label: 'Market Command Center', icon: Home, badge: 'Live' },
@@ -149,7 +150,7 @@ export const Navigation: React.FC<NavigationProps> = ({ isMobileOpen, setIsMobil
               </div>
               <div>
                 <p className="text-xs font-bold text-white leading-tight">{investorProfile.name}</p>
-                <p className="text-[10px] text-slate-400">{investorProfile.market}</p>
+                <p className="text-[10px] text-blue-400 font-mono truncate max-w-[130px]">{user?.email || investorProfile.market}</p>
               </div>
             </div>
             <ChevronRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
@@ -168,6 +169,16 @@ export const Navigation: React.FC<NavigationProps> = ({ isMobileOpen, setIsMobil
               <span className="font-semibold text-amber-400 font-mono">₹15K</span>
             </div>
           </div>
+        </button>
+
+        {/* Quick Sign Out Action */}
+        <button
+          onClick={logout}
+          className="w-full mt-2 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-900/60 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 text-[11px] font-semibold transition-colors"
+          title="Sign out or switch Gmail account"
+        >
+          <LogOut className="h-3 w-3" />
+          <span>Sign Out / Switch Gmail</span>
         </button>
       </div>
     </aside>

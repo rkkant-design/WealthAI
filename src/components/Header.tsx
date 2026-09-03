@@ -11,7 +11,10 @@ import {
   TrendingUp,
   TrendingDown,
   X,
-  ArrowRight
+  ArrowRight,
+  User,
+  LogOut,
+  RotateCcw
 } from 'lucide-react';
 import { useWealth } from '../context/WealthContext';
 
@@ -27,18 +30,27 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
     setIsDailyBriefingOpen, 
     setIsAddInvestmentOpen,
     unreadAlertCount,
-    setActiveTab
+    setActiveTab,
+    user,
+    logout,
+    clearPortfolioToCleanSlate,
+    portfolio
   } = useWealth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close search dropdown on click outside
+  // Close search and user menu on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setIsSearchOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -322,6 +334,91 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
               </span>
             )}
           </button>
+
+          {/* User Gmail Profile Dropdown */}
+          <div className="relative" ref={userMenuRef}>
+            <button
+              id="header-user-menu-btn"
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-left transition-all"
+              title={user?.email || 'User Account'}
+            >
+              <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
+                {user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <div className="hidden md:block text-left min-w-0 max-w-[130px]">
+                <div className="text-xs font-bold text-white truncate leading-tight">
+                  {user?.name || 'Investor'}
+                </div>
+                <div className="text-[10px] text-slate-400 truncate leading-tight">
+                  {user?.email || 'Logged in'}
+                </div>
+              </div>
+              <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isUserMenuOpen && (
+              <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
+                      {user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{user?.name || 'Investor'}</p>
+                      <p className="text-[11px] font-mono text-blue-400 truncate">{user?.email}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
+                    <span className="text-slate-400">Portfolio Status</span>
+                    <span className={`font-mono font-bold ${portfolio.length === 0 ? 'text-emerald-400' : 'text-blue-400'}`}>
+                      {portfolio.length === 0 ? 'Clean Slate (0 holdings)' : `${portfolio.length} Active Holdings`}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Reset your portfolio to a clean slate (0 holdings)? This removes all current holdings so you can start fresh.')) {
+                        clearPortfolioToCleanSlate();
+                        setActiveTab('portfolio');
+                        setIsUserMenuOpen(false);
+                      }
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-amber-300 hover:text-white hover:bg-amber-500/20 transition-colors text-left"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+                    <span>Reset to Clean Slate Portfolio</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('profile');
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left"
+                  >
+                    <User className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                    <span>Investor Profile & Settings</span>
+                  </button>
+
+                  <div className="border-t border-slate-800 my-1" />
+
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-rose-400 hover:text-white hover:bg-rose-500/20 transition-colors text-left"
+                  >
+                    <LogOut className="h-3.5 w-3.5 text-rose-400 flex-shrink-0" />
+                    <span>Sign Out / Switch Account</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

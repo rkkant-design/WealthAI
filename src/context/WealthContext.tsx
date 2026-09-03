@@ -10,7 +10,8 @@ import {
   WatchlistItem, 
   MonthlyPlanAllocation, 
   AlertItem, 
-  StockEvidence 
+  StockEvidence,
+  AuthUser
 } from '../types';
 import { 
   initialInvestorProfile, 
@@ -93,11 +94,25 @@ interface WealthContextType {
     largestSectorName: string;
     bankingExposurePercent: number;
   };
+
+  // Authentication & Clean Slate
+  user: AuthUser | null;
+  isLoggedIn: boolean;
+  loginWithGmail: (email: string, name?: string, startClean?: boolean) => void;
+  logout: () => void;
+  clearPortfolioToCleanSlate: () => void;
+  loadDemoPortfolio: () => void;
 }
 
 const WealthContext = createContext<WealthContextType | undefined>(undefined);
 
 export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Authentication State
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const saved = localStorage.getItem('wealthpilot_auth_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
   // Persistence via localStorage with fallbacks
   const [investorProfile, setInvestorProfile] = useState<InvestorProfile>(() => {
     const saved = localStorage.getItem('wealthpilot_profile');
@@ -105,6 +120,16 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>(() => {
+    const savedUser = localStorage.getItem('wealthpilot_auth_user');
+    if (savedUser) {
+      try {
+        const u = JSON.parse(savedUser);
+        const userPort = localStorage.getItem(`wealthpilot_portfolio_${u.email}`);
+        if (userPort) {
+          return JSON.parse(userPort);
+        }
+      } catch {}
+    }
     const saved = localStorage.getItem('wealthpilot_portfolio');
     return saved ? JSON.parse(saved) : initialPortfolio;
   });
@@ -190,7 +215,60 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     localStorage.setItem('wealthpilot_portfolio', JSON.stringify(portfolio));
-  }, [portfolio]);
+    if (user?.email) {
+      localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify(portfolio));
+    }
+  }, [portfolio, user]);
+
+  const loginWithGmail = (email: string, name?: string, startClean: boolean = true) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const displayName = name || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const newUser: AuthUser = {
+      id: `usr-${Date.now()}`,
+      email: cleanEmail,
+      name: displayName,
+      isGoogleUser: true,
+      loginTime: new Date().toISOString(),
+    };
+    setUser(newUser);
+    localStorage.setItem('wealthpilot_auth_user', JSON.stringify(newUser));
+    setInvestorProfile((prev) => ({
+      ...prev,
+      name: displayName,
+    }));
+
+    if (startClean) {
+      setPortfolio([]);
+      localStorage.setItem(`wealthpilot_portfolio_${cleanEmail}`, JSON.stringify([]));
+      localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
+    } else {
+      const existingUserPortfolio = localStorage.getItem(`wealthpilot_portfolio_${cleanEmail}`);
+      if (existingUserPortfolio) {
+        setPortfolio(JSON.parse(existingUserPortfolio));
+      }
+    }
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('wealthpilot_auth_user');
+  };
+
+  const clearPortfolioToCleanSlate = () => {
+    setPortfolio([]);
+    if (user?.email) {
+      localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify([]));
+    }
+    localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
+  };
+
+  const loadDemoPortfolio = () => {
+    setPortfolio(initialPortfolio);
+    if (user?.email) {
+      localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify(initialPortfolio));
+    }
+    localStorage.setItem('wealthpilot_portfolio', JSON.stringify(initialPortfolio));
+  };
 
   useEffect(() => {
     localStorage.setItem('wealthpilot_watchlist', JSON.stringify(watchlist));
@@ -537,6 +615,12 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         openReviewModal,
         closeReviewModal,
         portfolioStats,
+        user,
+        isLoggedIn: !!user,
+        loginWithGmail,
+        logout,
+        clearPortfolioToCleanSlate,
+        loadDemoPortfolio,
       }}
     >
       {children}

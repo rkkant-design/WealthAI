@@ -245,6 +245,15 @@ export interface AlertItem {
   targetTab?: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  isGoogleUser: boolean;
+  loginTime: string;
+}
+
 export interface CopilotMessage {
   id: string;
   sender: 'user' | 'ai';

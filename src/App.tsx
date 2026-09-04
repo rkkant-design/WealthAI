@@ -17,6 +17,7 @@ import { AICopilotView } from './components/AICopilotView';
 import { FinalSummaryView } from './components/FinalSummaryView';
 import { InvestorProfileView } from './components/InvestorProfileView';
 import { LoginScreen } from './components/LoginScreen';
+import { HomePage } from './components/HomePage';
 
 // Modals
 import { DailyBriefingModal } from './components/DailyBriefingModal';
@@ -69,11 +70,19 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 const AppContent: React.FC = () => {
-  const { activeTab, isLoggedIn } = useWealth();
+  const { activeTab, isLoggedIn, authView, setAuthView } = useWealth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   if (!isLoggedIn) {
-    return <LoginScreen />;
+    if (authView === 'login') {
+      return <LoginScreen onBackToHome={() => setAuthView('home')} />;
+    }
+    return (
+      <HomePage
+        onGetStarted={() => setAuthView('login')}
+        onLogin={() => setAuthView('login')}
+      />
+    );
   }
 
   const renderActiveView = () => {

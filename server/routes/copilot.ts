@@ -21,18 +21,33 @@ router.post("/copilot", async (req, res) => {
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `User Portfolio Context:\n${JSON.stringify(context || {}, null, 2)}\n\nUser Question/Request:\n${prompt}`,
-      config: {
-        systemInstruction: COPILOT_SYSTEM_INSTRUCTION,
-        temperature: 0.35,
-      },
-    });
+    let text = "";
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: `User Portfolio Context:\n${JSON.stringify(context || {}, null, 2)}\n\nUser Question/Request:\n${prompt}`,
+        config: {
+          systemInstruction: COPILOT_SYSTEM_INSTRUCTION,
+          temperature: 0.35,
+        },
+      });
+      text = response.text || "";
+    } catch (modelErr: any) {
+      console.warn("Primary model error, attempting fallback:", modelErr?.message);
+      const fallbackResponse = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: `User Portfolio Context:\n${JSON.stringify(context || {}, null, 2)}\n\nUser Question/Request:\n${prompt}`,
+        config: {
+          systemInstruction: COPILOT_SYSTEM_INSTRUCTION,
+          temperature: 0.35,
+        },
+      });
+      text = fallbackResponse.text || "";
+    }
 
     return res.json({
       source: "gemini_live",
-      text: response.text,
+      text,
     });
   } catch (error: any) {
     console.error("Gemini copilot router error:", error);

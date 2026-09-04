@@ -14,7 +14,10 @@ import {
   ArrowRight,
   User,
   LogOut,
-  RotateCcw
+  RotateCcw,
+  Cloud,
+  RefreshCw,
+  CheckCircle2
 } from 'lucide-react';
 import { useWealth } from '../context/WealthContext';
 
@@ -34,7 +37,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
     user,
     logout,
     clearPortfolioToCleanSlate,
-    portfolio
+    portfolio,
+    cloudSyncStatus,
+    lastSyncedTime,
+    syncWithCloud
   } = useWealth();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -335,6 +341,25 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
             )}
           </button>
 
+          {/* Cloud Database Status Indicator */}
+          <button
+            id="header-cloud-sync-btn"
+            onClick={() => syncWithCloud()}
+            title={`Cloud Database: ${cloudSyncStatus === 'synced' ? 'Synced at ' + (lastSyncedTime || 'recently') : cloudSyncStatus}. Click to sync now.`}
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-300 text-xs transition-colors group"
+          >
+            <Cloud className={`h-3.5 w-3.5 transition-colors ${
+              cloudSyncStatus === 'synced' 
+                ? 'text-emerald-400' 
+                : cloudSyncStatus === 'syncing' 
+                ? 'text-blue-400 animate-pulse' 
+                : 'text-amber-400'
+            }`} />
+            <span className="text-[11px] font-medium text-slate-300 group-hover:text-white">
+              {cloudSyncStatus === 'syncing' ? 'Syncing...' : cloudSyncStatus === 'synced' ? 'Cloud Synced' : 'Local'}
+            </span>
+          </button>
+
           {/* User Gmail Profile Dropdown */}
           <div className="relative" ref={userMenuRef}>
             <button
@@ -358,7 +383,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
             </button>
 
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
                 <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 mb-2">
                   <div className="flex items-center gap-2.5">
                     <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
@@ -369,15 +394,38 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
                       <p className="text-[11px] font-mono text-blue-400 truncate">{user?.email}</p>
                     </div>
                   </div>
-                  <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
-                    <span className="text-slate-400">Portfolio Status</span>
-                    <span className={`font-mono font-bold ${portfolio.length === 0 ? 'text-emerald-400' : 'text-blue-400'}`}>
-                      {portfolio.length === 0 ? 'Clean Slate (0 holdings)' : `${portfolio.length} Active Holdings`}
-                    </span>
+                  <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-1.5 text-[10px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Portfolio Status</span>
+                      <span className={`font-mono font-bold ${portfolio.length === 0 ? 'text-emerald-400' : 'text-blue-400'}`}>
+                        {portfolio.length === 0 ? 'Clean Slate (0 holdings)' : `${portfolio.length} Active Holdings`}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 flex items-center gap-1">
+                        <Cloud className="h-3 w-3 text-cyan-400" />
+                        Firestore Database
+                      </span>
+                      <span className={`font-mono font-bold flex items-center gap-1 ${
+                        cloudSyncStatus === 'synced' ? 'text-emerald-400' : cloudSyncStatus === 'syncing' ? 'text-blue-400' : 'text-amber-400'
+                      }`}>
+                        {cloudSyncStatus === 'synced' && <CheckCircle2 className="h-3 w-3 text-emerald-400" />}
+                        {cloudSyncStatus === 'syncing' ? 'Syncing...' : cloudSyncStatus === 'synced' ? `Synced ${lastSyncedTime ? `(${lastSyncedTime})` : ''}` : 'Local Mode'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-1">
+                  <button
+                    onClick={() => {
+                      syncWithCloud();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-cyan-300 hover:text-white hover:bg-cyan-500/20 transition-colors text-left"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 text-cyan-400 flex-shrink-0 ${cloudSyncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                    <span>Sync Cloud Database Now</span>
+                  </button>
                   <button
                     onClick={() => {
                       if (window.confirm('Reset your portfolio to a clean slate (0 holdings)? This removes all current holdings so you can start fresh.')) {

@@ -11,8 +11,19 @@ import {
   MonthlyPlanAllocation, 
   AlertItem, 
   StockEvidence,
-  AuthUser
+  AuthUser,
+  RegisteredAccount
 } from '../types';
+import { 
+  savePortfolioToFirestore, 
+  loadPortfolioFromFirestore, 
+  saveProfileToFirestore, 
+  loadProfileFromFirestore, 
+  saveWatchlistToFirestore, 
+  loadWatchlistFromFirestore, 
+  saveAccountToFirestore, 
+  loadAccountsFromFirestore 
+} from '../lib/firebase';
 import { 
   initialInvestorProfile, 
   mockMarketIndices, 
@@ -95,22 +106,64 @@ interface WealthContextType {
     bankingExposurePercent: number;
   };
 
+  // Public Landing / Auth View routing
+  authView: 'home' | 'login';
+  setAuthView: (view: 'home' | 'login') => void;
+
   // Authentication & Clean Slate
   user: AuthUser | null;
   isLoggedIn: boolean;
+  registeredAccounts: RegisteredAccount[];
+  loginWithCredentials: (email: string, password: string, startClean?: boolean) => { success: boolean; error?: string };
+  registerAccount: (name: string, email: string, password: string, riskProfile?: 'Low' | 'Medium' | 'High', startClean?: boolean) => { success: boolean; error?: string };
   loginWithGmail: (email: string, name?: string, startClean?: boolean) => void;
   logout: () => void;
   clearPortfolioToCleanSlate: () => void;
   loadDemoPortfolio: () => void;
+
+  // Cloud Database Sync (Google Cloud Firestore)
+  cloudSyncStatus: 'synced' | 'syncing' | 'offline' | 'saved_locally';
+  lastSyncedTime: string | null;
+  syncWithCloud: () => Promise<void>;
 }
 
 const WealthContext = createContext<WealthContextType | undefined>(undefined);
 
 export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Navigation / Landing Page view when unauthenticated
+  const [authView, setAuthView] = useState<'home' | 'login'>('home');
+
   // Authentication State
   const [user, setUser] = useState<AuthUser | null>(() => {
     const saved = localStorage.getItem('wealthpilot_auth_user');
     return saved ? JSON.parse(saved) : null;
+  });
+
+  // User Accounts Database in LocalStorage
+  const [registeredAccounts, setRegisteredAccounts] = useState<RegisteredAccount[]>(() => {
+    const saved = localStorage.getItem('wealthpilot_registered_users');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Failed to parse registered users:', e);
+      }
+    }
+    // Seed standard initial verified account
+    const defaultAccounts: RegisteredAccount[] = [
+      {
+        id: 'usr-default-rk',
+        email: 'rkkant@gmail.com',
+        name: 'RK Kant',
+        passwordHash: 'WealthPilot@2026',
+        riskProfile: 'Medium',
+        createdAt: '2026-01-15T09:00:00.000Z',
+        lastLogin: new Date().toISOString(),
+      },
+    ];
+    localStorage.setItem('wealthpilot_registered_users', JSON.stringify(defaultAccounts));
+    return defaultAccounts;
   });
 
   // Persistence via localStorage with fallbacks
@@ -170,6 +223,128 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isAddInvestmentOpen, setIsAddInvestmentOpen] = useState<boolean>(false);
   const [reviewModalItem, setReviewModalItem] = useState<PortfolioItem | null>(null);
 
+  // Cloud Database Sync State (Firestore)
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'saved_locally'>('saved_locally');
+  const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
+
+  // Load all registered accounts from Firestore on mount
+  useEffect(() => {
+    let isMounted = true;
+    loadAccountsFromFirestore()
+      .then((cloudAccounts) => {
+        if (!isMounted || !cloudAccounts || cloudAccounts.length === 0) return;
+        setRegisteredAccounts((prev) => {
+          const map = new Map<string, RegisteredAccount>();
+          prev.forEach((acc) => map.set(acc.email.toLowerCase(), acc));
+          cloudAccounts.forEach((acc) => map.set(acc.email.toLowerCase(), acc));
+          const merged = Array.from(map.values());
+          localStorage.setItem('wealthpilot_registered_users', JSON.stringify(merged));
+          return merged;
+        });
+      })
+      .catch((err) => {
+        console.warn('Notice loading cloud accounts:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Sync user data from Firestore on login or switch
+  useEffect(() => {
+    if (!user?.email) {
+      setCloudSyncStatus('offline');
+      return;
+    }
+
+    let isMounted = true;
+    setCloudSyncStatus('syncing');
+
+    Promise.all([
+      loadPortfolioFromFirestore(user.email),
+      loadProfileFromFirestore(user.email),
+      loadWatchlistFromFirestore(user.email),
+    ])
+      .then(([cloudPortfolio, cloudProfile, cloudWatchlist]) => {
+        if (!isMounted) return;
+
+        if (cloudPortfolio !== null) {
+          setPortfolio(cloudPortfolio);
+          localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify(cloudPortfolio));
+          localStorage.setItem('wealthpilot_portfolio', JSON.stringify(cloudPortfolio));
+        } else {
+          // First time cloud initialization for this user: persist current portfolio to cloud
+          savePortfolioToFirestore(user.email, portfolio);
+        }
+
+        if (cloudProfile !== null) {
+          setInvestorProfile(cloudProfile);
+          localStorage.setItem('wealthpilot_profile', JSON.stringify(cloudProfile));
+        } else {
+          saveProfileToFirestore(user.email, investorProfile);
+        }
+
+        if (cloudWatchlist !== null) {
+          setWatchlist(cloudWatchlist);
+          localStorage.setItem('wealthpilot_watchlist', JSON.stringify(cloudWatchlist));
+        } else {
+          saveWatchlistToFirestore(user.email, watchlist);
+        }
+
+        setCloudSyncStatus('synced');
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      })
+      .catch((err) => {
+        console.warn('Error fetching cloud data:', err);
+        if (isMounted) setCloudSyncStatus('saved_locally');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.email]);
+
+  // Debounced auto-sync to Cloud Firestore when portfolio, profile, or watchlist changes
+  useEffect(() => {
+    if (!user?.email) return;
+
+    setCloudSyncStatus('syncing');
+    const timer = setTimeout(async () => {
+      try {
+        await Promise.all([
+          savePortfolioToFirestore(user.email, portfolio),
+          saveProfileToFirestore(user.email, investorProfile),
+          saveWatchlistToFirestore(user.email, watchlist),
+        ]);
+        setCloudSyncStatus('synced');
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      } catch (err) {
+        console.warn('Auto cloud sync failed:', err);
+        setCloudSyncStatus('saved_locally');
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [portfolio, investorProfile, watchlist, user?.email]);
+
+  // Manual trigger to sync all active state to Firestore
+  const syncWithCloud = async () => {
+    if (!user?.email) return;
+    setCloudSyncStatus('syncing');
+    try {
+      await Promise.all([
+        savePortfolioToFirestore(user.email, portfolio),
+        saveProfileToFirestore(user.email, investorProfile),
+        saveWatchlistToFirestore(user.email, watchlist),
+      ]);
+      setCloudSyncStatus('synced');
+      setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    } catch (err) {
+      console.error('Manual cloud sync failed:', err);
+      setCloudSyncStatus('saved_locally');
+    }
+  };
+
   // Fetch real-time exchange quote from backend proxy
   const fetchLiveQuote = async (symbolOrQuery: string): Promise<Stock | null> => {
     if (!symbolOrQuery) return null;
@@ -220,6 +395,141 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [portfolio, user]);
 
+  const registerAccount = (
+    name: string,
+    email: string,
+    password: string,
+    riskProfile: 'Low' | 'Medium' | 'High' = 'Medium',
+    startClean: boolean = true
+  ): { success: boolean; error?: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+    if (!password || password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+    if (!name.trim()) {
+      return { success: false, error: 'Please provide your full name.' };
+    }
+
+    const existing = registeredAccounts.find((a) => a.email.toLowerCase() === cleanEmail);
+    if (existing) {
+      return { success: false, error: 'An account with this email already exists. Please sign in.' };
+    }
+
+    const newAccount: RegisteredAccount = {
+      id: `acc-${Date.now()}`,
+      email: cleanEmail,
+      name: name.trim(),
+      passwordHash: password,
+      riskProfile,
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+    };
+
+    const updated = [newAccount, ...registeredAccounts];
+    setRegisteredAccounts(updated);
+    localStorage.setItem('wealthpilot_registered_users', JSON.stringify(updated));
+    // Persist to Cloud Firestore
+    saveAccountToFirestore(newAccount);
+
+    // Sign in immediately
+    const newUser: AuthUser = {
+      id: newAccount.id,
+      email: newAccount.email,
+      name: newAccount.name,
+      isGoogleUser: false,
+      loginTime: new Date().toISOString(),
+      riskProfile,
+    };
+    setUser(newUser);
+    localStorage.setItem('wealthpilot_auth_user', JSON.stringify(newUser));
+
+    setInvestorProfile((prev) => ({
+      ...prev,
+      name: newAccount.name,
+      riskProfile,
+    }));
+
+    if (startClean) {
+      setPortfolio([]);
+      localStorage.setItem(`wealthpilot_portfolio_${cleanEmail}`, JSON.stringify([]));
+      localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
+      savePortfolioToFirestore(cleanEmail, []);
+    }
+
+    return { success: true };
+  };
+
+  const loginWithCredentials = (
+    email: string,
+    password: string,
+    startClean: boolean = false
+  ): { success: boolean; error?: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+    if (!password) {
+      return { success: false, error: 'Please enter your password.' };
+    }
+
+    // Find account
+    const account = registeredAccounts.find((a) => a.email.toLowerCase() === cleanEmail);
+    if (!account) {
+      return {
+        success: false,
+        error: 'No account found with this email. Please check your spelling or create an account.',
+      };
+    }
+
+    if (account.passwordHash !== password) {
+      return {
+        success: false,
+        error: 'Incorrect password for this account. Please verify or use the demo password: WealthPilot@2026',
+      };
+    }
+
+    // Success: log in
+    const newUser: AuthUser = {
+      id: account.id,
+      email: account.email,
+      name: account.name,
+      isGoogleUser: false,
+      loginTime: new Date().toISOString(),
+      riskProfile: account.riskProfile,
+    };
+    setUser(newUser);
+    localStorage.setItem('wealthpilot_auth_user', JSON.stringify(newUser));
+
+    // Update lastLogin
+    const updatedAccounts = registeredAccounts.map((a) =>
+      a.id === account.id ? { ...a, lastLogin: new Date().toISOString() } : a
+    );
+    setRegisteredAccounts(updatedAccounts);
+    localStorage.setItem('wealthpilot_registered_users', JSON.stringify(updatedAccounts));
+
+    setInvestorProfile((prev) => ({
+      ...prev,
+      name: account.name,
+      riskProfile: account.riskProfile || prev.riskProfile,
+    }));
+
+    if (startClean) {
+      setPortfolio([]);
+      localStorage.setItem(`wealthpilot_portfolio_${cleanEmail}`, JSON.stringify([]));
+      localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
+    } else {
+      const existingUserPortfolio = localStorage.getItem(`wealthpilot_portfolio_${cleanEmail}`);
+      if (existingUserPortfolio) {
+        setPortfolio(JSON.parse(existingUserPortfolio));
+      }
+    }
+
+    return { success: true };
+  };
+
   const loginWithGmail = (email: string, name?: string, startClean: boolean = true) => {
     const cleanEmail = email.trim().toLowerCase();
     const displayName = name || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -237,10 +547,28 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       name: displayName,
     }));
 
+    // Check if recorded in accounts list
+    if (!registeredAccounts.some((a) => a.email.toLowerCase() === cleanEmail)) {
+      const gAccount: RegisteredAccount = {
+        id: newUser.id,
+        email: cleanEmail,
+        name: displayName,
+        passwordHash: 'GoogleOAuth2026',
+        riskProfile: 'Medium',
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString(),
+      };
+      const updated = [gAccount, ...registeredAccounts];
+      setRegisteredAccounts(updated);
+      localStorage.setItem('wealthpilot_registered_users', JSON.stringify(updated));
+      saveAccountToFirestore(gAccount);
+    }
+
     if (startClean) {
       setPortfolio([]);
       localStorage.setItem(`wealthpilot_portfolio_${cleanEmail}`, JSON.stringify([]));
       localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
+      savePortfolioToFirestore(cleanEmail, []);
     } else {
       const existingUserPortfolio = localStorage.getItem(`wealthpilot_portfolio_${cleanEmail}`);
       if (existingUserPortfolio) {
@@ -252,12 +580,14 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const logout = () => {
     setUser(null);
     localStorage.removeItem('wealthpilot_auth_user');
+    setAuthView('home');
   };
 
   const clearPortfolioToCleanSlate = () => {
     setPortfolio([]);
     if (user?.email) {
       localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify([]));
+      savePortfolioToFirestore(user.email, []);
     }
     localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
   };
@@ -266,6 +596,7 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setPortfolio(initialPortfolio);
     if (user?.email) {
       localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify(initialPortfolio));
+      savePortfolioToFirestore(user.email, initialPortfolio);
     }
     localStorage.setItem('wealthpilot_portfolio', JSON.stringify(initialPortfolio));
   };
@@ -615,12 +946,20 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         openReviewModal,
         closeReviewModal,
         portfolioStats,
+        authView,
+        setAuthView,
         user,
         isLoggedIn: !!user,
+        registeredAccounts,
+        loginWithCredentials,
+        registerAccount,
         loginWithGmail,
         logout,
         clearPortfolioToCleanSlate,
         loadDemoPortfolio,
+        cloudSyncStatus,
+        lastSyncedTime,
+        syncWithCloud,
       }}
     >
       {children}

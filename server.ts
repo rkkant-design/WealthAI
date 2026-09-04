@@ -59,16 +59,48 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(
+      express.static(distPath, {
+        maxAge: "1d",
+        setHeaders: (res, filePath) => {
+          if (filePath.includes("/assets/")) {
+            // Immutable cache for fingerprinted JS/CSS/asset bundles
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          } else if (filePath.endsWith(".html")) {
+            // HTML files should never be cached so users always get fresh app releases
+            res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          }
+        },
+      })
+    );
     app.get("*", (_req: Request, res: Response) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  app.listen(PORT, CONFIG.HOST, () => {
+  const server = app.listen(PORT, CONFIG.HOST, () => {
     console.log(`🚀 WealthPilot AI production server running at http://${CONFIG.HOST}:${PORT}`);
     console.log(`📡 Environment: ${CONFIG.NODE_ENV} | Gemini Key: ${CONFIG.GEMINI_API_KEY ? "Configured" : "Not Detected"}`);
   });
+
+  // Graceful shutdown handling for Cloud Run container lifecycle
+  const handleShutdown = (signal: string) => {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    server.close(() => {
+      console.log("Closed all active HTTP connections. Process exiting.");
+      process.exit(0);
+    });
+
+    // Force exit if hanging after 8 seconds
+    setTimeout(() => {
+      console.error("Could not close connections in time, forcefully shutting down");
+      process.exit(1);
+    }, 8000).unref();
+  };
+
+  process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+  process.on("SIGINT", () => handleShutdown("SIGINT"));
 }
 
 startServer().catch((err) => {

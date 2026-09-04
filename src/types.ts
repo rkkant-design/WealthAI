@@ -252,6 +252,17 @@ export interface AuthUser {
   avatar?: string;
   isGoogleUser: boolean;
   loginTime: string;
+  riskProfile?: 'Low' | 'Medium' | 'High';
+}
+
+export interface RegisteredAccount {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  riskProfile: 'Low' | 'Medium' | 'High';
+  createdAt: string;
+  lastLogin: string;
 }
 
 export interface CopilotMessage {

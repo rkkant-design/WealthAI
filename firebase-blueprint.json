@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "Account": {
+      "fields": {
+        "email": { "type": "string", "description": "Account email" },
+        "name": { "type": "string", "description": "User display name" },
+        "passwordHash": { "type": "string", "description": "Encrypted credential" },
+        "riskProfile": { "type": "string", "description": "Low, Medium, or High" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" },
+        "lastLogin": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "UserProfile": {
+      "fields": {
+        "name": { "type": "string", "description": "Investor name" },
+        "riskProfile": { "type": "string", "description": "Risk profile archetype" },
+        "monthlyInvestment": { "type": "number", "description": "Monthly SIP amount in INR" },
+        "targetCapital": { "type": "number", "description": "Goal corpus" },
+        "horizonYears": { "type": "number", "description": "Investment horizon in years" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "Holding": {
+      "fields": {
+        "symbol": { "type": "string", "description": "Stock symbol (e.g. TCS, HDFCBANK)" },
+        "companyName": { "type": "string", "description": "Full company name" },
+        "sector": { "type": "string", "description": "Market sector" },
+        "shares": { "type": "number", "description": "Quantity held" },
+        "buyPrice": { "type": "number", "description": "Average purchase price in INR" },
+        "currentPrice": { "type": "number", "description": "Current market price in INR" },
+        "pe": { "type": "number", "description": "Current P/E ratio" },
+        "grahamFairValue": { "type": "number", "description": "Calculated Graham Fair Value" },
+        "thesis": { "type": "string", "description": "Original investment thesis" },
+        "thesisStatus": { "type": "string", "description": "Thesis state (Intact, Under Review, Broken)" },
+        "targetPrice": { "type": "number", "description": "Target exit/evaluation price" },
+        "stopLoss": { "type": "number", "description": "Safety threshold" },
+        "convictionScore": { "type": "number", "description": "Score 1-100" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "WatchlistItem": {
+      "fields": {
+        "symbol": { "type": "string", "description": "Stock symbol" },
+        "companyName": { "type": "string", "description": "Company name" },
+        "sector": { "type": "string", "description": "Market sector" },
+        "currentPrice": { "type": "number", "description": "Current market price" },
+        "targetBuyPrice": { "type": "number", "description": "Desired entry price" },
+        "thesis": { "type": "string", "description": "Reason for watching" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    }
+  }
+}

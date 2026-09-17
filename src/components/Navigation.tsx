@@ -178,7 +178,7 @@ export const Navigation: React.FC<NavigationProps> = ({ isMobileOpen, setIsMobil
           title="Sign out or switch Gmail account"
         >
           <LogOut className="h-3 w-3" />
-          <span>Sign Out / Switch Gmail</span>
+          <span>Sign Out</span>
         </button>
       </div>
     </aside>

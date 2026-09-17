@@ -32,19 +32,21 @@ import {
 import { useWealth } from '../context/WealthContext';
 
 export const StockAnalyzer: React.FC = () => {
-  const { 
-    stocks, 
-    selectedStock, 
-    setSelectedStockSymbol, 
-    addToWatchlist, 
-    removeFromWatchlist, 
-    isInWatchlist, 
+  const {
+    stocks,
+    selectedStock,
+    setSelectedStockSymbol,
+    addToWatchlist,
+    removeFromWatchlist,
+    isInWatchlist,
     setIsAddInvestmentOpen,
     openEvidenceModal,
     portfolioStats,
     isFetchingLiveQuote,
-    fetchLiveQuote
+    fetchLiveQuote,
+    investorProfile
   } = useWealth();
+  const firstName = (investorProfile.name || 'Investor').split(' ')[0];
 
   const [financialMetric, setFinancialMetric] = useState<'revenue' | 'profit' | 'eps' | 'roce' | 'fcf' | 'operatingMargin'>('revenue');
   const [chartViewMode, setChartViewMode] = useState<'financials' | 'priceHistory'>('financials');
@@ -424,7 +426,7 @@ export const StockAnalyzer: React.FC = () => {
                 { label: 'Valuation Attractiveness', val: scoreBreakdown.valuation },
                 { label: 'Market Trend & Institutional Support', val: scoreBreakdown.marketTrend },
                 { label: 'Entry Point Timing', val: scoreBreakdown.entryPoint },
-                { label: 'Portfolio Fit for Kamal', val: scoreBreakdown.portfolioFit },
+                { label: `Portfolio Fit for ${firstName}`, val: scoreBreakdown.portfolioFit },
               ].map((factor, idx) => (
                 <div key={idx} className="flex items-center justify-between text-[11px]">
                   <span className="text-slate-400">{factor.label}</span>
@@ -452,7 +454,7 @@ export const StockAnalyzer: React.FC = () => {
               </span>
               <div className="flex items-center gap-2 mt-0.5">
                 <h3 className="font-extrabold text-base text-white">
-                  What Should Kamal Do?
+                  What Should {firstName} Do?
                 </h3>
                 <span
                   className={`text-xs font-black px-3 py-0.5 rounded-full border ${

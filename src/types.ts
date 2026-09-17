@@ -258,16 +258,6 @@ export interface AuthUser {
   riskProfile?: 'Low' | 'Medium' | 'High';
 }
 
-export interface RegisteredAccount {
-  id: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  riskProfile: 'Low' | 'Medium' | 'High';
-  createdAt: string;
-  lastLogin: string;
-}
-
 export interface CopilotMessage {
   id: string;
   sender: 'user' | 'ai';

@@ -211,7 +211,7 @@ export const MyPortfolio: React.FC = () => {
               Clean Slate Portfolio Initialized
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Logged in as <span className="font-mono text-emerald-400 font-bold">{user?.email || 'rkkant@gmail.com'}</span>. You have zero holdings recorded so you can start completely fresh with your real investments.
+              Logged in as <span className="font-mono text-emerald-400 font-bold">{user?.email || 'your account'}</span>. You have zero holdings recorded so you can start completely fresh with your real investments.
             </p>
           </div>
 

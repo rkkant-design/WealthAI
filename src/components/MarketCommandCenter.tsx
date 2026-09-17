@@ -121,7 +121,7 @@ export const MarketCommandCenter: React.FC = () => {
             </h2>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
-            Personalized for Kamal
+            Personalized for {investorProfile.name}
           </span>
         </div>
 
@@ -226,7 +226,7 @@ export const MarketCommandCenter: React.FC = () => {
           {/* AI Market View Box */}
           <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/40 relative">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5 mb-1.5">
-              <Sparkles className="h-3.5 w-3.5" /> AI Market View for Kamal
+              <Sparkles className="h-3.5 w-3.5" /> AI Market View for {investorProfile.name}
             </span>
             <p className="text-xs text-slate-300 leading-relaxed italic">
               "{marketRegime.aiMarketView}"

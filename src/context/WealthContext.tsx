@@ -11,18 +11,21 @@ import {
   MonthlyPlanAllocation, 
   AlertItem, 
   StockEvidence,
-  AuthUser,
-  RegisteredAccount
+  AuthUser
 } from '../types';
-import { 
-  savePortfolioToFirestore, 
-  loadPortfolioFromFirestore, 
-  saveProfileToFirestore, 
-  loadProfileFromFirestore, 
-  saveWatchlistToFirestore, 
-  loadWatchlistFromFirestore, 
-  saveAccountToFirestore, 
-  loadAccountsFromFirestore 
+import type { User } from 'firebase/auth';
+import {
+  savePortfolioToFirestore,
+  loadPortfolioFromFirestore,
+  saveProfileToFirestore,
+  loadProfileFromFirestore,
+  saveWatchlistToFirestore,
+  loadWatchlistFromFirestore,
+  signInWithEmail,
+  signUpWithEmail,
+  signInWithGoogle,
+  signOutUser,
+  subscribeToAuth,
 } from '../lib/firebase';
 import { 
   initialInvestorProfile, 
@@ -110,13 +113,13 @@ interface WealthContextType {
   authView: 'home' | 'login';
   setAuthView: (view: 'home' | 'login') => void;
 
-  // Authentication & Clean Slate
+  // Authentication & Clean Slate (Firebase Authentication)
   user: AuthUser | null;
   isLoggedIn: boolean;
-  registeredAccounts: RegisteredAccount[];
-  loginWithCredentials: (email: string, password: string, startClean?: boolean) => { success: boolean; error?: string };
-  registerAccount: (name: string, email: string, password: string, riskProfile?: 'Low' | 'Medium' | 'High', startClean?: boolean) => { success: boolean; error?: string };
-  loginWithGmail: (email: string, name?: string, startClean?: boolean) => void;
+  authReady: boolean;
+  loginWithCredentials: (email: string, password: string, startClean?: boolean) => Promise<{ success: boolean; error?: string }>;
+  registerAccount: (name: string, email: string, password: string, riskProfile?: 'Low' | 'Medium' | 'High', startClean?: boolean) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (startClean?: boolean) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   clearPortfolioToCleanSlate: () => void;
   loadDemoPortfolio: () => void;
@@ -133,37 +136,23 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Navigation / Landing Page view when unauthenticated
   const [authView, setAuthView] = useState<'home' | 'login'>('home');
 
-  // Authentication State
+  // Authentication State — source of truth is Firebase Auth (see effect below).
+  // We seed from a cached snapshot only for fast first paint on reload.
   const [user, setUser] = useState<AuthUser | null>(() => {
     const saved = localStorage.getItem('wealthpilot_auth_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [authReady, setAuthReady] = useState<boolean>(false);
+  // When a login/register requests "clean slate", we flag it here and the
+  // post-login data-load effect applies it once user data has been fetched.
+  const pendingCleanSlateRef = React.useRef<boolean>(false);
 
-  // User Accounts Database in LocalStorage
-  const [registeredAccounts, setRegisteredAccounts] = useState<RegisteredAccount[]>(() => {
-    const saved = localStorage.getItem('wealthpilot_registered_users');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse registered users:', e);
-      }
-    }
-    // Seed standard initial verified account
-    const defaultAccounts: RegisteredAccount[] = [
-      {
-        id: 'usr-default-rk',
-        email: 'rkkant@gmail.com',
-        name: 'RK Kant',
-        passwordHash: 'WealthPilot@2026',
-        riskProfile: 'Medium',
-        createdAt: '2026-01-15T09:00:00.000Z',
-        lastLogin: new Date().toISOString(),
-      },
-    ];
-    localStorage.setItem('wealthpilot_registered_users', JSON.stringify(defaultAccounts));
-    return defaultAccounts;
+  const mapFirebaseUser = (fbUser: User): AuthUser => ({
+    id: fbUser.uid,
+    email: fbUser.email || '',
+    name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Investor',
+    isGoogleUser: fbUser.providerData.some((p) => p.providerId === 'google.com'),
+    loginTime: new Date().toISOString(),
   });
 
   // Persistence via localStorage with fallbacks
@@ -177,7 +166,7 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (savedUser) {
       try {
         const u = JSON.parse(savedUser);
-        const userPort = localStorage.getItem(`wealthpilot_portfolio_${u.email}`);
+        const userPort = localStorage.getItem(`wealthpilot_portfolio_${u.id}`);
         if (userPort) {
           return JSON.parse(userPort);
         }
@@ -227,68 +216,70 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'saved_locally'>('saved_locally');
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
 
-  // Load all registered accounts from Firestore on mount
+  // Subscribe to Firebase Auth state. This is the single source of truth for
+  // who is logged in — no client-side password checks, no account list.
   useEffect(() => {
-    let isMounted = true;
-    loadAccountsFromFirestore()
-      .then((cloudAccounts) => {
-        if (!isMounted || !cloudAccounts || cloudAccounts.length === 0) return;
-        setRegisteredAccounts((prev) => {
-          const map = new Map<string, RegisteredAccount>();
-          prev.forEach((acc) => map.set(acc.email.toLowerCase(), acc));
-          cloudAccounts.forEach((acc) => map.set(acc.email.toLowerCase(), acc));
-          const merged = Array.from(map.values());
-          localStorage.setItem('wealthpilot_registered_users', JSON.stringify(merged));
-          return merged;
-        });
-      })
-      .catch((err) => {
-        console.warn('Notice loading cloud accounts:', err);
-      });
-    return () => {
-      isMounted = false;
-    };
+    const unsubscribe = subscribeToAuth((fbUser) => {
+      if (fbUser) {
+        const mapped = mapFirebaseUser(fbUser);
+        setUser(mapped);
+        localStorage.setItem('wealthpilot_auth_user', JSON.stringify(mapped));
+      } else {
+        setUser(null);
+        localStorage.removeItem('wealthpilot_auth_user');
+      }
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
   }, []);
 
-  // Sync user data from Firestore on login or switch
+  // Sync user data from Firestore on login or switch (keyed by Firebase uid)
   useEffect(() => {
-    if (!user?.email) {
+    if (!user?.id) {
       setCloudSyncStatus('offline');
       return;
     }
 
+    const uid = user.id;
     let isMounted = true;
     setCloudSyncStatus('syncing');
 
     Promise.all([
-      loadPortfolioFromFirestore(user.email),
-      loadProfileFromFirestore(user.email),
-      loadWatchlistFromFirestore(user.email),
+      loadPortfolioFromFirestore(uid),
+      loadProfileFromFirestore(uid),
+      loadWatchlistFromFirestore(uid),
     ])
       .then(([cloudPortfolio, cloudProfile, cloudWatchlist]) => {
         if (!isMounted) return;
 
-        if (cloudPortfolio !== null) {
+        // Honor a pending "clean slate" request from login/registration.
+        if (pendingCleanSlateRef.current) {
+          setPortfolio([]);
+          savePortfolioToFirestore(uid, []);
+          localStorage.setItem(`wealthpilot_portfolio_${uid}`, JSON.stringify([]));
+          localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
+          pendingCleanSlateRef.current = false;
+        } else if (cloudPortfolio !== null) {
           setPortfolio(cloudPortfolio);
-          localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify(cloudPortfolio));
+          localStorage.setItem(`wealthpilot_portfolio_${uid}`, JSON.stringify(cloudPortfolio));
           localStorage.setItem('wealthpilot_portfolio', JSON.stringify(cloudPortfolio));
         } else {
           // First time cloud initialization for this user: persist current portfolio to cloud
-          savePortfolioToFirestore(user.email, portfolio);
+          savePortfolioToFirestore(uid, portfolio);
         }
 
         if (cloudProfile !== null) {
           setInvestorProfile(cloudProfile);
           localStorage.setItem('wealthpilot_profile', JSON.stringify(cloudProfile));
         } else {
-          saveProfileToFirestore(user.email, investorProfile);
+          saveProfileToFirestore(uid, investorProfile);
         }
 
         if (cloudWatchlist !== null) {
           setWatchlist(cloudWatchlist);
           localStorage.setItem('wealthpilot_watchlist', JSON.stringify(cloudWatchlist));
         } else {
-          saveWatchlistToFirestore(user.email, watchlist);
+          saveWatchlistToFirestore(uid, watchlist);
         }
 
         setCloudSyncStatus('synced');
@@ -302,19 +293,20 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       isMounted = false;
     };
-  }, [user?.email]);
+  }, [user?.id]);
 
   // Debounced auto-sync to Cloud Firestore when portfolio, profile, or watchlist changes
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.id) return;
+    const uid = user.id;
 
     setCloudSyncStatus('syncing');
     const timer = setTimeout(async () => {
       try {
         await Promise.all([
-          savePortfolioToFirestore(user.email, portfolio),
-          saveProfileToFirestore(user.email, investorProfile),
-          saveWatchlistToFirestore(user.email, watchlist),
+          savePortfolioToFirestore(uid, portfolio),
+          saveProfileToFirestore(uid, investorProfile),
+          saveWatchlistToFirestore(uid, watchlist),
         ]);
         setCloudSyncStatus('synced');
         setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -325,17 +317,17 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [portfolio, investorProfile, watchlist, user?.email]);
+  }, [portfolio, investorProfile, watchlist, user?.id]);
 
   // Manual trigger to sync all active state to Firestore
   const syncWithCloud = async () => {
-    if (!user?.email) return;
+    if (!user?.id) return;
     setCloudSyncStatus('syncing');
     try {
       await Promise.all([
-        savePortfolioToFirestore(user.email, portfolio),
-        saveProfileToFirestore(user.email, investorProfile),
-        saveWatchlistToFirestore(user.email, watchlist),
+        savePortfolioToFirestore(user.id, portfolio),
+        saveProfileToFirestore(user.id, investorProfile),
+        saveWatchlistToFirestore(user.id, watchlist),
       ]);
       setCloudSyncStatus('synced');
       setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -390,194 +382,65 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     localStorage.setItem('wealthpilot_portfolio', JSON.stringify(portfolio));
-    if (user?.email) {
-      localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify(portfolio));
+    if (user?.id) {
+      localStorage.setItem(`wealthpilot_portfolio_${user.id}`, JSON.stringify(portfolio));
     }
   }, [portfolio, user]);
 
-  const registerAccount = (
+  // Create a new account via Firebase Authentication (Firebase hashes the
+  // password server-side; we never store or see it).
+  const registerAccount = async (
     name: string,
     email: string,
     password: string,
     riskProfile: 'Low' | 'Medium' | 'High' = 'Medium',
     startClean: boolean = true
-  ): { success: boolean; error?: string } => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, error: 'Please enter a valid email address.' };
-    }
-    if (!password || password.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters.' };
-    }
+  ): Promise<{ success: boolean; error?: string }> => {
     if (!name.trim()) {
       return { success: false, error: 'Please provide your full name.' };
     }
-
-    const existing = registeredAccounts.find((a) => a.email.toLowerCase() === cleanEmail);
-    if (existing) {
-      return { success: false, error: 'An account with this email already exists. Please sign in.' };
+    const res = await signUpWithEmail(name, email, password);
+    if (!res.success) {
+      return { success: false, error: res.error };
     }
-
-    const newAccount: RegisteredAccount = {
-      id: `acc-${Date.now()}`,
-      email: cleanEmail,
-      name: name.trim(),
-      passwordHash: password,
-      riskProfile,
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-    };
-
-    const updated = [newAccount, ...registeredAccounts];
-    setRegisteredAccounts(updated);
-    localStorage.setItem('wealthpilot_registered_users', JSON.stringify(updated));
-    // Persist to Cloud Firestore
-    saveAccountToFirestore(newAccount);
-
-    // Sign in immediately
-    const newUser: AuthUser = {
-      id: newAccount.id,
-      email: newAccount.email,
-      name: newAccount.name,
-      isGoogleUser: false,
-      loginTime: new Date().toISOString(),
-      riskProfile,
-    };
-    setUser(newUser);
-    localStorage.setItem('wealthpilot_auth_user', JSON.stringify(newUser));
-
+    // The auth listener sets `user`; the post-login effect applies clean slate.
+    pendingCleanSlateRef.current = !!startClean;
     setInvestorProfile((prev) => ({
       ...prev,
-      name: newAccount.name,
+      name: name.trim(),
       riskProfile,
     }));
-
-    if (startClean) {
-      setPortfolio([]);
-      localStorage.setItem(`wealthpilot_portfolio_${cleanEmail}`, JSON.stringify([]));
-      localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
-      savePortfolioToFirestore(cleanEmail, []);
-    }
-
     return { success: true };
   };
 
-  const loginWithCredentials = (
+  // Sign in with email/password via Firebase Authentication.
+  const loginWithCredentials = async (
     email: string,
     password: string,
     startClean: boolean = false
-  ): { success: boolean; error?: string } => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, error: 'Please enter a valid email address.' };
+  ): Promise<{ success: boolean; error?: string }> => {
+    const res = await signInWithEmail(email, password);
+    if (!res.success) {
+      return { success: false, error: res.error };
     }
-    if (!password) {
-      return { success: false, error: 'Please enter your password.' };
-    }
-
-    // Find account
-    const account = registeredAccounts.find((a) => a.email.toLowerCase() === cleanEmail);
-    if (!account) {
-      return {
-        success: false,
-        error: 'No account found with this email. Please check your spelling or create an account.',
-      };
-    }
-
-    if (account.passwordHash !== password) {
-      return {
-        success: false,
-        error: 'Incorrect password for this account. Please verify or use the demo password: WealthPilot@2026',
-      };
-    }
-
-    // Success: log in
-    const newUser: AuthUser = {
-      id: account.id,
-      email: account.email,
-      name: account.name,
-      isGoogleUser: false,
-      loginTime: new Date().toISOString(),
-      riskProfile: account.riskProfile,
-    };
-    setUser(newUser);
-    localStorage.setItem('wealthpilot_auth_user', JSON.stringify(newUser));
-
-    // Update lastLogin
-    const updatedAccounts = registeredAccounts.map((a) =>
-      a.id === account.id ? { ...a, lastLogin: new Date().toISOString() } : a
-    );
-    setRegisteredAccounts(updatedAccounts);
-    localStorage.setItem('wealthpilot_registered_users', JSON.stringify(updatedAccounts));
-
-    setInvestorProfile((prev) => ({
-      ...prev,
-      name: account.name,
-      riskProfile: account.riskProfile || prev.riskProfile,
-    }));
-
-    if (startClean) {
-      setPortfolio([]);
-      localStorage.setItem(`wealthpilot_portfolio_${cleanEmail}`, JSON.stringify([]));
-      localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
-    } else {
-      const existingUserPortfolio = localStorage.getItem(`wealthpilot_portfolio_${cleanEmail}`);
-      if (existingUserPortfolio) {
-        setPortfolio(JSON.parse(existingUserPortfolio));
-      }
-    }
-
+    pendingCleanSlateRef.current = !!startClean;
     return { success: true };
   };
 
-  const loginWithGmail = (email: string, name?: string, startClean: boolean = true) => {
-    const cleanEmail = email.trim().toLowerCase();
-    const displayName = name || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    const newUser: AuthUser = {
-      id: `usr-${Date.now()}`,
-      email: cleanEmail,
-      name: displayName,
-      isGoogleUser: true,
-      loginTime: new Date().toISOString(),
-    };
-    setUser(newUser);
-    localStorage.setItem('wealthpilot_auth_user', JSON.stringify(newUser));
-    setInvestorProfile((prev) => ({
-      ...prev,
-      name: displayName,
-    }));
-
-    // Check if recorded in accounts list
-    if (!registeredAccounts.some((a) => a.email.toLowerCase() === cleanEmail)) {
-      const gAccount: RegisteredAccount = {
-        id: newUser.id,
-        email: cleanEmail,
-        name: displayName,
-        passwordHash: 'GoogleOAuth2026',
-        riskProfile: 'Medium',
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString(),
-      };
-      const updated = [gAccount, ...registeredAccounts];
-      setRegisteredAccounts(updated);
-      localStorage.setItem('wealthpilot_registered_users', JSON.stringify(updated));
-      saveAccountToFirestore(gAccount);
+  // Real Google OAuth via Firebase (popup). No more trusting a typed email.
+  const loginWithGoogle = async (
+    startClean: boolean = false
+  ): Promise<{ success: boolean; error?: string }> => {
+    const res = await signInWithGoogle();
+    if (!res.success) {
+      return { success: false, error: res.error };
     }
-
-    if (startClean) {
-      setPortfolio([]);
-      localStorage.setItem(`wealthpilot_portfolio_${cleanEmail}`, JSON.stringify([]));
-      localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
-      savePortfolioToFirestore(cleanEmail, []);
-    } else {
-      const existingUserPortfolio = localStorage.getItem(`wealthpilot_portfolio_${cleanEmail}`);
-      if (existingUserPortfolio) {
-        setPortfolio(JSON.parse(existingUserPortfolio));
-      }
-    }
+    pendingCleanSlateRef.current = !!startClean;
+    return { success: true };
   };
 
   const logout = () => {
+    void signOutUser();
     setUser(null);
     localStorage.removeItem('wealthpilot_auth_user');
     setAuthView('home');
@@ -585,18 +448,18 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const clearPortfolioToCleanSlate = () => {
     setPortfolio([]);
-    if (user?.email) {
-      localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify([]));
-      savePortfolioToFirestore(user.email, []);
+    if (user?.id) {
+      localStorage.setItem(`wealthpilot_portfolio_${user.id}`, JSON.stringify([]));
+      savePortfolioToFirestore(user.id, []);
     }
     localStorage.setItem('wealthpilot_portfolio', JSON.stringify([]));
   };
 
   const loadDemoPortfolio = () => {
     setPortfolio(initialPortfolio);
-    if (user?.email) {
-      localStorage.setItem(`wealthpilot_portfolio_${user.email}`, JSON.stringify(initialPortfolio));
-      savePortfolioToFirestore(user.email, initialPortfolio);
+    if (user?.id) {
+      localStorage.setItem(`wealthpilot_portfolio_${user.id}`, JSON.stringify(initialPortfolio));
+      savePortfolioToFirestore(user.id, initialPortfolio);
     }
     localStorage.setItem('wealthpilot_portfolio', JSON.stringify(initialPortfolio));
   };
@@ -950,10 +813,10 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setAuthView,
         user,
         isLoggedIn: !!user,
-        registeredAccounts,
+        authReady,
         loginWithCredentials,
         registerAccount,
-        loginWithGmail,
+        loginWithGoogle,
         logout,
         clearPortfolioToCleanSlate,
         loadDemoPortfolio,

@@ -22,12 +22,13 @@ interface Message {
 
 export const AICopilotView: React.FC = () => {
   const { investorProfile, portfolio, marketIndices, marketRegime, portfolioStats } = useWealth();
+  const firstName = (investorProfile.name || 'Investor').split(' ')[0];
 
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: `Hello Kamal! I am your **WealthPilot AI Investment Intelligence Agent**. 
+      content: `Hello ${firstName}! I am your **WealthPilot AI Investment Intelligence Agent**.
 
 I have full context of your:
 - **Profile:** Medium Risk • Long-Term Horizon (10-20 yrs) • Monthly Budget ₹15,000
@@ -82,11 +83,14 @@ Ask me anything about stock entry timing, valuation multiples, portfolio risk, o
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: userText,
-          investorProfile,
-          portfolio,
-          marketIndices,
-          marketRegime,
-          history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+          context: {
+            investorProfile,
+            portfolio,
+            marketIndices,
+            marketRegime,
+            portfolioStats,
+            history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+          },
         }),
       });
 
@@ -99,7 +103,7 @@ Ask me anything about stock entry timing, valuation multiples, portfolio risk, o
       const aiMessage: Message = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
-        content: data.reply || 'I analyzed your request against your portfolio and NSE market data.',
+        content: data.text || data.reply || 'I analyzed your request against your portfolio and NSE market data.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -107,7 +111,7 @@ Ask me anything about stock entry timing, valuation multiples, portfolio risk, o
     } catch (err) {
       console.error(err);
       // Fallback intelligent response if server is disconnected or offline
-      let fallbackText = `### AI Advisory Analysis for Kamal
+      let fallbackText = `### AI Advisory Analysis for ${firstName}
 
 Based on your **₹15,000 monthly budget** and **Medium Risk profile**:
 
@@ -144,7 +148,7 @@ Based on your **₹15,000 monthly budget** and **Medium Risk profile**:
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              NSE India Equity Intelligence • Persona: Disciplined Wealth Advisor for Kamal
+              NSE India Equity Intelligence • Persona: Disciplined Wealth Advisor for {firstName}
             </p>
           </div>
         </div>
@@ -155,7 +159,7 @@ Based on your **₹15,000 monthly budget** and **Medium Risk profile**:
               {
                 id: 'welcome-reset',
                 role: 'assistant',
-                content: `Chat history reset. How can I assist your investment decisions today, Kamal?`,
+                content: `Chat history reset. How can I assist your investment decisions today, ${firstName}?`,
                 timestamp: 'Just now',
               },
             ])

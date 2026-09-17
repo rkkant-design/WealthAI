@@ -76,6 +76,33 @@ Notes:
 
 ---
 
+## 3b. Alternative: Deploy to Netlify (static SPA + Functions)
+
+Netlify cannot run the Express server, so the app is served as a static SPA
+(`dist/`) and the `/api/*` routes run as **Netlify Functions**
+(`netlify/functions/*`, which reuse the same service code). This is wired up via
+`netlify.toml`.
+
+1. Push this branch to GitHub (done).
+2. In Netlify: **Add new site → Import from Git**, pick the `WealthAI` repo and
+   the `production-hardening` branch. Netlify reads `netlify.toml` automatically
+   (build `npm run build:client`, publish `dist`, functions `netlify/functions`).
+3. **Site settings → Environment variables**, add:
+   - `GEMINI_API_KEY` (required for copilot + stock analysis)
+   - optional: `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `NODE_ENV=production`
+4. Fill `firebase-applet-config.json` with your Firebase web config and commit it
+   (or set it before importing). Firebase Auth is client-side and host-agnostic.
+5. After the first deploy, add the Netlify domain (`*.netlify.app` and any custom
+   domain) to Firebase **Authentication → Authorized domains**, or Google
+   sign-in will be rejected.
+6. Verify `https://<site>.netlify.app/api/health` returns `hasGeminiKey: true`.
+
+**Netlify tradeoffs vs Cloud Run:** Functions are stateless per-invocation, so
+the in-memory rate limiter and the 6-hour stock-analysis cache do not persist
+between cold starts. To protect Gemini billing, set a quota cap on the API key
+in Google AI Studio (and/or enable Netlify's rate limiting). Cold starts add
+latency to the first request after idle.
+
 ## 4. Local development
 
 ```bash

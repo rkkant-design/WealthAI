@@ -235,11 +235,23 @@ function buildNeutralFallback(input: StockAnalysisInput): StockAnalysis {
   };
 }
 
-function stripJsonFences(text: string): string {
-  return text
+// Robustly pull a JSON object out of a model response that may include code
+// fences or surrounding prose.
+function extractJson(text: string): any {
+  const cleaned = text
     .replace(/^\s*```(?:json)?/i, "")
     .replace(/```\s*$/i, "")
     .trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const first = cleaned.indexOf("{");
+    const last = cleaned.lastIndexOf("}");
+    if (first !== -1 && last > first) {
+      return JSON.parse(cleaned.slice(first, last + 1));
+    }
+    throw new Error("No JSON object found in model response");
+  }
 }
 
 function buildPrompt(input: StockAnalysisInput): string {
@@ -399,17 +411,42 @@ export async function generateStockAnalysis(input: StockAnalysisInput): Promise<
     return buildNeutralFallback(input);
   }
 
+  const prompt = buildPrompt(input);
+  // Ask for JSON in the prompt (not via responseMimeType, which some models
+  // reject) and try the primary model, then the fallback — same pattern as the
+  // copilot route, which works reliably.
+  // Cap the model call so the parent (serverless) function does not hit its
+  // ~10s timeout — degrade to the neutral fallback instead.
+  const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([
+      p,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error("analysis timeout")), ms)),
+    ]);
+
+  const callModel = async (model: string, ms: number): Promise<string> => {
+    const response = await withTimeout(
+      ai.models.generateContent({ model, contents: prompt, config: { temperature: 0.3 } }),
+      ms
+    );
+    return response.text || "";
+  };
+
   try {
-    const response = await ai.models.generateContent({
-      model: CONFIG.GEMINI_MODEL,
-      contents: buildPrompt(input),
-      config: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-      },
-    });
-    const text = response.text || "";
-    const raw = JSON.parse(stripJsonFences(text));
+    let text = "";
+    const start = Date.now();
+    try {
+      text = await callModel(CONFIG.GEMINI_MODEL, 8500);
+    } catch (primaryErr: any) {
+      console.warn(`Analysis primary model error (${CONFIG.GEMINI_MODEL}):`, primaryErr?.message);
+      // Only try the fallback model if the primary failed fast (a real API error,
+      // not a timeout) — otherwise we would blow the serverless time budget.
+      if (Date.now() - start < 3000) {
+        text = await callModel(CONFIG.GEMINI_FALLBACK_MODEL, 5000);
+      } else {
+        throw primaryErr;
+      }
+    }
+    const raw = extractJson(text);
     const analysis = assembleFromRaw(raw, input);
     cache.set(cacheKey, { data: analysis, expiresAt: Date.now() + CACHE_TTL_MS });
     return analysis;

@@ -1826,9 +1826,10 @@ const SPECIAL_INDIAN_STOCKS: Record<string, Stock> = {
     week52Low: 2.35,
     wealthScore: 24,
     isPennyStock: true,
-    isLiveExchangeData: true,
+    isLiveExchangeData: false,
+    analysisSource: 'curated',
     exchange: 'NSE',
-    lastUpdatedTime: '15:30 IST',
+    lastUpdatedTime: 'Snapshot',
     pennyStockWarning: '⚠️ High-Risk Penny & Microcap Advisory: Radaan Mediaworks trades at ₹2.89 with microcap capitalization (< ₹20 Cr). Microcaps carry extreme illiquidity risk, vulnerability to operator pumps, erratic financial reporting, and wide bid-ask spreads. It does NOT meet disciplined long-term wealth preservation criteria.',
     scoreBreakdown: {
       fundamentalQuality: 20,
@@ -1983,6 +1984,11 @@ export function lookupOrGenerateStock(query: string, currentUniverse: Stock[]): 
     week52High: Number((basePrice * 1.25).toFixed(2)),
     week52Low: Number((basePrice * 0.78).toFixed(2)),
     wealthScore,
+    // This is a client-side PLACEHOLDER shown instantly while the backend fetches
+    // the real live price + AI analysis. It is not live data and not audited —
+    // flag it so the UI shows the "estimate / verify" banner and never claims live.
+    isLiveExchangeData: false,
+    analysisSource: 'unavailable',
     scoreBreakdown: {
       fundamentalQuality: 82 + (seed % 12),
       growth: 80 + (seed % 14),

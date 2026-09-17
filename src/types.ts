@@ -104,6 +104,9 @@ export interface Stock {
   wealthScore: number;
   isPennyStock?: boolean;
   isLiveExchangeData?: boolean;
+  // Where the fundamental/valuation analysis came from. Price fields may be live
+  // (isLiveExchangeData) while the analysis is an AI estimate — never conflate them.
+  analysisSource?: 'ai_estimate' | 'unavailable' | 'curated';
   exchange?: 'NSE' | 'BSE';
   lastUpdatedTime?: string;
   pennyStockWarning?: string;

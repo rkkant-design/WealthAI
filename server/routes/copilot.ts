@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getGeminiClient, COPILOT_SYSTEM_INSTRUCTION } from "../gemini.js";
+import { CONFIG } from "../config.js";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.post("/copilot", async (req, res) => {
     let text = "";
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: CONFIG.GEMINI_MODEL,
         contents: `User Portfolio Context:\n${JSON.stringify(context || {}, null, 2)}\n\nUser Question/Request:\n${prompt}`,
         config: {
           systemInstruction: COPILOT_SYSTEM_INSTRUCTION,
@@ -35,7 +36,7 @@ router.post("/copilot", async (req, res) => {
     } catch (modelErr: any) {
       console.warn("Primary model error, attempting fallback:", modelErr?.message);
       const fallbackResponse = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: CONFIG.GEMINI_FALLBACK_MODEL,
         contents: `User Portfolio Context:\n${JSON.stringify(context || {}, null, 2)}\n\nUser Question/Request:\n${prompt}`,
         config: {
           systemInstruction: COPILOT_SYSTEM_INSTRUCTION,

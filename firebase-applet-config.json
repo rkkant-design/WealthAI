@@ -1,12 +1,12 @@
 {
-  "projectId": "manifest-monitor-8n50x",
-  "appId": "1:30540086656:web:9519df124a586a1831d565",
-  "apiKey": "AIzaSyAUMlx_qW2YGg_2Bk_TlO7C5xY_tvQCkVI",
-  "authDomain": "manifest-monitor-8n50x.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-wealthpilotai-6ca8c34e-fb19-4d13-93ff-8cff88ee9e60",
-  "storageBucket": "manifest-monitor-8n50x.firebasestorage.app",
-  "messagingSenderId": "30540086656",
+  "projectId": "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID",
+  "appId": "REPLACE_WITH_YOUR_WEB_APP_ID",
+  "apiKey": "REPLACE_WITH_YOUR_WEB_API_KEY",
+  "authDomain": "REPLACE_WITH_YOUR_PROJECT.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "REPLACE_WITH_YOUR_PROJECT.firebasestorage.app",
+  "messagingSenderId": "REPLACE_WITH_YOUR_SENDER_ID",
   "measurementId": "",
-  "oAuthClientId": "30540086656-pg22l0eobqmqc80ihc1s011o3g5rgirn.apps.googleusercontent.com",
+  "oAuthClientId": "REPLACE_WITH_YOUR_OAUTH_CLIENT_ID",
   "recaptchaSiteKey": ""
 }

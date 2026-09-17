@@ -81,7 +81,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onLogin }) => 
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="font-semibold text-slate-300">NSE Live Pulse</span>
+            <span className="font-semibold text-slate-300">NSE Market Pulse</span>
+            <span className="text-[9px] font-normal text-slate-500 uppercase tracking-wider">Illustrative</span>
           </div>
 
           <div className="flex items-center gap-6 overflow-x-auto no-scrollbar py-0.5">

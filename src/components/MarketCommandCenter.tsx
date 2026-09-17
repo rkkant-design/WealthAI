@@ -18,10 +18,11 @@ import {
 import { useWealth } from '../context/WealthContext';
 
 export const MarketCommandCenter: React.FC = () => {
-  const { 
-    investorProfile, 
-    marketIndices, 
-    marketRegime, 
+  const {
+    investorProfile,
+    marketIndices,
+    marketDataLive,
+    marketRegime,
     portfolioStats, 
     monthlyPlan, 
     setActiveTab, 
@@ -70,8 +71,12 @@ export const MarketCommandCenter: React.FC = () => {
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
             Key NSE Benchmarks & Volatility
           </span>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-            Demo Market Data
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+            marketDataLive
+              ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'
+              : 'bg-slate-800 text-slate-400 border-slate-700'
+          }`}>
+            {marketDataLive ? 'Live NSE/BSE' : 'Sample data'}
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">

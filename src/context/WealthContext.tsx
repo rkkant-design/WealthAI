@@ -45,6 +45,7 @@ interface WealthContextType {
   investorProfile: InvestorProfile;
   updateInvestorProfile: (profile: Partial<InvestorProfile>) => void;
   marketIndices: MarketIndex[];
+  marketDataLive: boolean;
   marketRegime: MarketRegime;
   macroIndicators: MacroIndicator[];
   sectors: SectorData[];
@@ -205,6 +206,47 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [monthlyPlan, setMonthlyPlan] = useState<MonthlyPlanAllocation[]>(defaultMonthlyPlan);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isFetchingLiveQuote, setIsFetchingLiveQuote] = useState<boolean>(false);
+
+  // Live market indices (from /api/market-overview). Falls back to sample data
+  // until the live fetch resolves; `marketDataLive` tells the UI which it is.
+  const [marketIndices, setMarketIndices] = useState<MarketIndex[]>(mockMarketIndices);
+  const [marketDataLive, setMarketDataLive] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadOverview = async () => {
+      try {
+        const res = await fetch('/api/market-overview');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted || !Array.isArray(data.indices) || data.indices.length === 0) return;
+        const mapped: MarketIndex[] = data.indices.map((b: any) => {
+          const sample = mockMarketIndices.find((m) => m.symbol === b.name);
+          return {
+            symbol: b.name,
+            name: b.name,
+            value: b.currentValue,
+            change: b.change,
+            changePercent: b.changePercent,
+            isPositive: b.change >= 0,
+            high52: b.high52w,
+            low52: b.low52w,
+            sparkline: sample?.sparkline || [],
+          };
+        });
+        setMarketIndices(mapped);
+        setMarketDataLive(true);
+      } catch (err) {
+        console.warn('Market overview fetch fallback:', err);
+      }
+    };
+    loadOverview();
+    const interval = setInterval(loadOverview, 60_000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Modals
   const [evidenceModalData, setEvidenceModalData] = useState<{ stockName: string; evidence: StockEvidence[] } | null>(null);
@@ -772,7 +814,8 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       value={{
         investorProfile,
         updateInvestorProfile,
-        marketIndices: mockMarketIndices,
+        marketIndices,
+        marketDataLive,
         marketRegime: mockMarketRegime,
         macroIndicators: mockMacroIndicators,
         sectors: mockSectors,

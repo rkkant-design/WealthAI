@@ -234,7 +234,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-400 group-hover:text-blue-100 mt-0.5">
-                        Fetches live exchange prices, audited financials, institutional valuation, and penny stock/microcap risk checks
+                        Fetches live exchange prices, plus AI-estimated fundamentals, valuation and penny stock/microcap risk checks
                       </p>
                     </div>
                     <span className="px-2 py-1 rounded bg-blue-500/20 text-blue-300 group-hover:bg-white group-hover:text-blue-900 text-[10px] font-bold font-mono">

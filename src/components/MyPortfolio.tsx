@@ -181,20 +181,24 @@ export const MyPortfolio: React.FC = () => {
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-          <span className="text-[11px] text-slate-400 block mb-1">Annualized Return (XIRR)</span>
+          <span className="text-[11px] text-slate-400 block mb-1">Annualized Return</span>
           <div className="text-xl font-black text-cyan-300 font-mono">
-            {portfolioStats.xirr}%
+            {portfolioStats.xirr === null ? 'N/A' : `${portfolioStats.xirr}%`}
           </div>
-          <span className="text-[10px] text-slate-400 block mt-1">vs NIFTY 50 (13.2%)</span>
+          <span className="text-[10px] text-slate-400 block mt-1">
+            {portfolioStats.xirr === null ? 'Add holdings to calculate' : 'Since first purchase'}
+          </span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
           <span className="text-[11px] text-slate-400 block mb-1">Portfolio Health Score</span>
           <div className="text-xl font-black text-emerald-400 font-mono">
-            {portfolioStats.healthScore} <span className="text-xs text-slate-400 font-normal">/ 100</span>
+            {portfolioStats.healthScore === null ? '—' : portfolioStats.healthScore} <span className="text-xs text-slate-400 font-normal">/ 100</span>
           </div>
           <span className="text-[10px] text-slate-400 block mt-1">
-            {portfolioStats.healthScore > 80 ? 'Grade A (Disciplined)' : 'Needs Diversification'}
+            {portfolioStats.healthScore === null
+              ? 'No holdings yet'
+              : portfolioStats.healthScore > 80 ? 'Grade A (Disciplined)' : 'Needs Diversification'}
           </span>
         </div>
       </div>
@@ -211,7 +215,7 @@ export const MyPortfolio: React.FC = () => {
               Clean Slate Portfolio Initialized
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Logged in as <span className="font-mono text-emerald-400 font-bold">{user?.email || 'rkkant@gmail.com'}</span>. You have zero holdings recorded so you can start completely fresh with your real investments.
+              Logged in as <span className="font-mono text-emerald-400 font-bold">{user?.email || 'your account'}</span>. You have zero holdings recorded so you can start completely fresh with your real investments.
             </p>
           </div>
 

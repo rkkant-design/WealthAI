@@ -104,6 +104,9 @@ export interface Stock {
   wealthScore: number;
   isPennyStock?: boolean;
   isLiveExchangeData?: boolean;
+  // Where the fundamental/valuation analysis came from. Price fields may be live
+  // (isLiveExchangeData) while the analysis is an AI estimate — never conflate them.
+  analysisSource?: 'ai_estimate' | 'unavailable' | 'curated';
   exchange?: 'NSE' | 'BSE';
   lastUpdatedTime?: string;
   pennyStockWarning?: string;
@@ -253,16 +256,6 @@ export interface AuthUser {
   isGoogleUser: boolean;
   loginTime: string;
   riskProfile?: 'Low' | 'Medium' | 'High';
-}
-
-export interface RegisteredAccount {
-  id: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  riskProfile: 'Low' | 'Medium' | 'High';
-  createdAt: string;
-  lastLogin: string;
 }
 
 export interface CopilotMessage {

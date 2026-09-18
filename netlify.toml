@@ -1,0 +1,57 @@
+# Netlify configuration for WealthPilot AI
+# The Express server (server.ts) is NOT used on Netlify. The React app is served
+# as a static SPA from dist/, and the /api/* routes run as Netlify Functions
+# (netlify/functions/*) which reuse the same service code as the Express server.
+
+[build]
+  command = "npm run build:client"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  node_bundler = "esbuild"
+
+# --- API routes -> Netlify Functions (must come BEFORE the SPA fallback) ---
+[[redirects]]
+  from = "/api/stock-quote"
+  to = "/.netlify/functions/stock-quote"
+  status = 200
+
+[[redirects]]
+  from = "/api/stock-search"
+  to = "/.netlify/functions/stock-search"
+  status = 200
+
+[[redirects]]
+  from = "/api/market-overview"
+  to = "/.netlify/functions/market-overview"
+  status = 200
+
+[[redirects]]
+  from = "/api/copilot"
+  to = "/.netlify/functions/copilot"
+  status = 200
+
+[[redirects]]
+  from = "/api/portfolio/export-csv"
+  to = "/.netlify/functions/portfolio-export-csv"
+  status = 200
+
+[[redirects]]
+  from = "/api/portfolio/audit"
+  to = "/.netlify/functions/portfolio-audit"
+  status = 200
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+# --- SPA fallback: everything else serves the React app ---
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

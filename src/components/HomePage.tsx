@@ -21,7 +21,9 @@ import {
   Globe2,
   Clock,
   Zap,
-  Award
+  Award,
+  Menu,
+  X
 } from 'lucide-react';
 
 interface HomePageProps {
@@ -32,6 +34,15 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onLogin }) => {
   const [activePreviewTab, setActivePreviewTab] = useState<'regime' | 'valuation' | 'thesis' | 'risk'>('valuation');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { href: '#features', label: 'Features' },
+    { href: '#valuation', label: '9-Factor Engine' },
+    { href: '#preview', label: 'Platform Tour' },
+    { href: '#methodology', label: 'Philosophy' },
+    { href: '#faq', label: 'FAQ' },
+  ];
 
   const marketTickers = [
     { symbol: 'NIFTY 50', price: '24,840.50', change: '+142.30', pct: '+0.58%', isPositive: true },
@@ -81,7 +92,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onLogin }) => 
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="font-semibold text-slate-300">NSE Live Pulse</span>
+            <span className="font-semibold text-slate-300">NSE Market Pulse</span>
+            <span className="text-[9px] font-normal text-slate-500 uppercase tracking-wider">Illustrative</span>
           </div>
 
           <div className="flex items-center gap-6 overflow-x-auto no-scrollbar py-0.5">
@@ -148,8 +160,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onLogin }) => 
               <span>Launch App</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
+              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-900 border border-slate-800 transition-all"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Nav Menu */}
+        {mobileMenuOpen && (
+          <nav className="md:hidden border-t border-slate-800 bg-slate-950/95 backdrop-blur-md">
+            <div className="max-w-7xl mx-auto px-4 py-2 flex flex-col">
+              {navLinks.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="py-3 text-sm font-medium text-slate-300 hover:text-white border-b border-slate-800/60 last:border-0 transition-colors"
+                >
+                  {l.label}
+                </a>
+              ))}
+            </div>
+          </nav>
+        )}
       </header>
 
       {/* Hero Section */}
@@ -639,7 +678,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onLogin }) => 
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-600 text-[10px]">
             <span>© 2026 WealthPilot AI. Built for serious Indian equity compounders.</span>
-            <span>Cloud Run Singapore Region • Real-time NSE/BSE Engine</span>
+            <span>Real-time NSE/BSE Engine • Live Market Data</span>
           </div>
         </div>
       </footer>

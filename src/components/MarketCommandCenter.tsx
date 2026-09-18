@@ -18,10 +18,11 @@ import {
 import { useWealth } from '../context/WealthContext';
 
 export const MarketCommandCenter: React.FC = () => {
-  const { 
-    investorProfile, 
-    marketIndices, 
-    marketRegime, 
+  const {
+    investorProfile,
+    marketIndices,
+    marketDataLive,
+    marketRegime,
     portfolioStats, 
     monthlyPlan, 
     setActiveTab, 
@@ -70,8 +71,12 @@ export const MarketCommandCenter: React.FC = () => {
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
             Key NSE Benchmarks & Volatility
           </span>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-            Demo Market Data
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+            marketDataLive
+              ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'
+              : 'bg-slate-800 text-slate-400 border-slate-700'
+          }`}>
+            {marketDataLive ? 'Live NSE/BSE' : 'Sample data'}
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -121,7 +126,7 @@ export const MarketCommandCenter: React.FC = () => {
             </h2>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
-            Personalized for Kamal
+            Personalized for {investorProfile.name}
           </span>
         </div>
 
@@ -132,7 +137,11 @@ export const MarketCommandCenter: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Your Portfolio</span>
-            <span className="font-bold text-emerald-300">Healthy (84/100)</span>
+            <span className="font-bold text-emerald-300">
+              {portfolioStats.healthScore === null
+                ? 'No holdings yet'
+                : `${portfolioStats.healthScore >= 80 ? 'Healthy' : 'Review'} (${portfolioStats.healthScore}/100)`}
+            </span>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Best Action</span>
@@ -140,7 +149,7 @@ export const MarketCommandCenter: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Monthly Budget</span>
-            <span className="font-bold text-white font-mono">₹15,000</span>
+            <span className="font-bold text-white font-mono">₹{investorProfile.monthlyBudget.toLocaleString('en-IN')}</span>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Deploy Now</span>
@@ -156,7 +165,9 @@ export const MarketCommandCenter: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-rose-900/40">
             <span className="text-[10px] text-rose-400 block mb-0.5">Requires Review</span>
-            <span className="font-bold text-rose-300">Apex Specialty</span>
+            <span className="font-bold text-rose-300">
+              {(portfolio.find((p) => p.thesisStatus === 'WEAKENING') || portfolio.find((p) => p.thesisStatus === 'MONITOR'))?.stockSymbol || 'None'}
+            </span>
           </div>
         </div>
       </div>
@@ -226,7 +237,7 @@ export const MarketCommandCenter: React.FC = () => {
           {/* AI Market View Box */}
           <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/40 relative">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5 mb-1.5">
-              <Sparkles className="h-3.5 w-3.5" /> AI Market View for Kamal
+              <Sparkles className="h-3.5 w-3.5" /> AI Market View for {investorProfile.name}
             </span>
             <p className="text-xs text-slate-300 leading-relaxed italic">
               "{marketRegime.aiMarketView}"
@@ -242,13 +253,13 @@ export const MarketCommandCenter: React.FC = () => {
                 Portfolio Vitality
               </span>
               <span className="text-xs font-bold text-emerald-400 font-mono">
-                XIRR: {portfolioStats.xirr}%
+                Return: {portfolioStats.xirr === null ? 'N/A' : `${portfolioStats.xirr}%`}
               </span>
             </div>
 
             <div className="flex items-center gap-4 my-4">
               <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex flex-col items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                <span className="text-xl font-black font-mono leading-none">{portfolioStats.healthScore}</span>
+                <span className="text-xl font-black font-mono leading-none">{portfolioStats.healthScore === null ? '—' : portfolioStats.healthScore}</span>
                 <span className="text-[9px] font-semibold text-emerald-100">/ 100</span>
               </div>
               <div>

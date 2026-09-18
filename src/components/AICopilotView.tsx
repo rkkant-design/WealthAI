@@ -22,17 +22,28 @@ interface Message {
 
 export const AICopilotView: React.FC = () => {
   const { investorProfile, portfolio, marketIndices, marketRegime, portfolioStats } = useWealth();
+  const firstName = (investorProfile.name || 'Investor').split(' ')[0];
+
+  // Build the greeting from the REAL account state, not a fictional portfolio.
+  const budgetStr = investorProfile.monthlyBudget.toLocaleString('en-IN');
+  const niftyIdx = marketIndices.find(
+    (i) => (i.symbol || '').toUpperCase().includes('NIFTY 50') || (i.name || '').toUpperCase().includes('NIFTY 50')
+  );
+  const niftyStr = niftyIdx ? niftyIdx.value.toLocaleString('en-IN') : '—';
+  const portfolioLine = portfolio.length === 0
+    ? `**Portfolio:** No holdings recorded yet — add investments and I'll track your thesis, returns and concentration.`
+    : `**Portfolio:** ₹${Math.round(portfolioStats.currentValue).toLocaleString('en-IN')} across ${portfolio.length} holding${portfolio.length > 1 ? 's' : ''} • Banking exposure ${portfolioStats.bankingExposurePercent}%`;
 
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: `Hello Kamal! I am your **WealthPilot AI Investment Intelligence Agent**. 
+      content: `Hello ${firstName}! I am your **WealthPilot AI Investment Intelligence Agent**.
 
-I have full context of your:
-- **Profile:** Medium Risk • Long-Term Horizon (10-20 yrs) • Monthly Budget ₹15,000
-- **Portfolio:** ₹4,18,650 Current Value • 57.5% Banking Exposure (HDFC & ICICI) • Apex Chem Alert
-- **Market:** NSE India (NIFTY 24,852) • Regime: Cautiously Positive (84% Confidence)
+Here's what I'm working with:
+- **Profile:** ${investorProfile.riskProfile} Risk • ${investorProfile.investmentHorizon} • Monthly Budget ₹${budgetStr}
+- ${portfolioLine}
+- **Market:** NSE India (NIFTY ${niftyStr}) • Regime: ${marketRegime.status} (${marketRegime.confidence}% Confidence)
 
 Ask me anything about stock entry timing, valuation multiples, portfolio risk, or where to deploy your monthly capital.`,
       timestamp: 'Just now',
@@ -82,11 +93,14 @@ Ask me anything about stock entry timing, valuation multiples, portfolio risk, o
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: userText,
-          investorProfile,
-          portfolio,
-          marketIndices,
-          marketRegime,
-          history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+          context: {
+            investorProfile,
+            portfolio,
+            marketIndices,
+            marketRegime,
+            portfolioStats,
+            history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+          },
         }),
       });
 
@@ -99,22 +113,27 @@ Ask me anything about stock entry timing, valuation multiples, portfolio risk, o
       const aiMessage: Message = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
-        content: data.reply || 'I analyzed your request against your portfolio and NSE market data.',
+        content: data.text || data.reply || 'I analyzed your request against your portfolio and NSE market data.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err) {
       console.error(err);
-      // Fallback intelligent response if server is disconnected or offline
-      let fallbackText = `### AI Advisory Analysis for Kamal
+      // Honest fallback when the live AI is momentarily unavailable — no invented
+      // holdings or fabricated numbers.
+      const fallbackText = portfolio.length === 0
+        ? `The live AI copilot is momentarily unavailable — please try again in a moment.
 
-Based on your **₹15,000 monthly budget** and **Medium Risk profile**:
+In the meantime, with a **₹${budgetStr} monthly budget** and a **${investorProfile.riskProfile} risk** profile, a disciplined start:
+- Use the **Stock Analyzer** to check a name's valuation vs its 5‑year median before buying.
+- Spread capital across sectors — avoid more than ~25% in any single one.
+- Keep some cash as dry powder for volatility.
 
-1. **Strategic Allocation:** Prioritize **TCS (₹4,190)** and **Sun Pharma (₹1,812)** as both are resting in their preferred buy zones with zero debt and ROE > 22%.
-2. **Concentration Guardrail:** Avoid adding to HDFC Bank or ICICI Bank this month because banking represents **57.5%** of your total portfolio.
-3. **Cash Reserve:** Hold **₹3,000** in liquid cash to exploit upcoming market volatility.
-4. **Attention Item:** Inspect **Apex Specialty Chem** due to operating margin compression.`;
+Add your holdings under **My Portfolio** and I'll tailor guidance to your actual positions.`
+        : `The live AI copilot is momentarily unavailable — please try again in a moment.
+
+Quick note on your portfolio: your largest exposure to watch is **${portfolioStats.bankingExposurePercent}% banking**. Favour quality names trading inside their preferred entry zones, and keep sector weights balanced. Retry shortly for a full AI analysis.`;
 
       const aiFallbackMessage: Message = {
         id: `ai-${Date.now()}`,
@@ -144,7 +163,7 @@ Based on your **₹15,000 monthly budget** and **Medium Risk profile**:
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              NSE India Equity Intelligence • Persona: Disciplined Wealth Advisor for Kamal
+              NSE India Equity Intelligence • Persona: Disciplined Wealth Advisor for {firstName}
             </p>
           </div>
         </div>
@@ -155,7 +174,7 @@ Based on your **₹15,000 monthly budget** and **Medium Risk profile**:
               {
                 id: 'welcome-reset',
                 role: 'assistant',
-                content: `Chat history reset. How can I assist your investment decisions today, Kamal?`,
+                content: `Chat history reset. How can I assist your investment decisions today, ${firstName}?`,
                 timestamp: 'Just now',
               },
             ])

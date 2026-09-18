@@ -1,20 +1,22 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if true;
-      
-      match /{allSubcollections=**} {
-        allow read, write: if true;
+
+    // A user may read and write ONLY their own document (keyed by their auth uid).
+    // Data is stored at users/{uid} by the app after Firebase Authentication.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
       }
     }
-    
-    match /accounts/{accountId} {
-      allow read, write: if true;
-    }
-    
+
+    // Everything else is denied. There is intentionally NO global 'accounts'
+    // collection and no world-readable data — credentials live in Firebase Auth,
+    // never in Firestore.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

@@ -35,8 +35,8 @@ export const Navigation: React.FC<NavigationProps> = ({ isMobileOpen, setIsMobil
     { id: 'sectors', label: 'Sector Intelligence', icon: Layers },
     { id: 'analyzer', label: 'Stock Analyzer', icon: Search },
     { id: 'opportunities', label: 'Opportunities', icon: Sparkles },
-    { id: 'portfolio', label: 'My Portfolio', icon: Briefcase, count: `${portfolioStats.healthScore}/100` },
-    { id: 'plan', label: 'Monthly Investment Plan', icon: Target, badge: '₹15K' },
+    { id: 'portfolio', label: 'My Portfolio', icon: Briefcase, count: portfolioStats.healthScore != null ? `${portfolioStats.healthScore}/100` : undefined },
+    { id: 'plan', label: 'Monthly Investment Plan', icon: Target, badge: `₹${Math.round(investorProfile.monthlyBudget / 1000)}K` },
     { id: 'watchlist', label: 'Watchlist', icon: Eye },
     { id: 'alerts', label: 'Alerts', icon: Bell, count: unreadAlertCount > 0 ? unreadAlertCount : undefined },
     { id: 'thesis', label: 'Investment Thesis', icon: BrainCircuit },
@@ -178,7 +178,7 @@ export const Navigation: React.FC<NavigationProps> = ({ isMobileOpen, setIsMobil
           title="Sign out or switch Gmail account"
         >
           <LogOut className="h-3 w-3" />
-          <span>Sign Out / Switch Gmail</span>
+          <span>Sign Out</span>
         </button>
       </div>
     </aside>

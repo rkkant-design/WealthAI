@@ -9,6 +9,7 @@ import stocksRouter from "./server/routes/stocks.js";
 import marketRouter from "./server/routes/market.js";
 import copilotRouter from "./server/routes/copilot.js";
 import portfolioRouter from "./server/routes/portfolio.js";
+import { createRateLimiter } from "./server/middleware/rateLimit.js";
 
 async function startServer() {
   const app = express();
@@ -34,11 +35,16 @@ async function startServer() {
     });
   }
 
+  // Rate limiters for the unauthenticated proxy endpoints (Yahoo + Gemini).
+  // Protects against scraping and Gemini quota/billing abuse.
+  const generalLimiter = createRateLimiter({ keyPrefix: "api", max: CONFIG.RATE_LIMIT_MAX });
+  const copilotLimiter = createRateLimiter({ keyPrefix: "copilot", max: CONFIG.COPILOT_RATE_LIMIT_MAX });
+
   // Mount API Endpoints
   app.use("/api", healthRouter);
-  app.use("/api", stocksRouter);
+  app.use("/api", generalLimiter, stocksRouter);
   app.use("/api", marketRouter);
-  app.use("/api", copilotRouter);
+  app.use("/api", copilotLimiter, copilotRouter);
   app.use("/api/portfolio", portfolioRouter);
 
   // Global Error Handler for API

@@ -69,7 +69,14 @@ export async function getMarketIndicesOverview(): Promise<{
 
   // Attempt real-time fetch from Yahoo Finance
   try {
-    const symbols = ['^NSEI', '^BSESN', '^NSEBANK'];
+    const indexNames: Record<string, string> = {
+      '^NSEI': 'NIFTY 50',
+      '^BSESN': 'SENSEX',
+      '^NSEBANK': 'BANK NIFTY',
+      '^INDIAVIX': 'INDIA VIX',
+    };
+    // Include INDIA VIX so it is not dropped when the live fetch succeeds.
+    const symbols = ['^NSEI', '^BSESN', '^NSEBANK', '^INDIAVIX'];
     const results = await Promise.allSettled(
       symbols.map(async (s) => {
         const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${s}?interval=1d&range=5d`, {
@@ -77,15 +84,24 @@ export async function getMarketIndicesOverview(): Promise<{
         });
         if (!res.ok) return null;
         const data: any = await res.json();
-        const meta = data.chart?.result?.[0]?.meta;
+        const result = data.chart?.result?.[0];
+        const meta = result?.meta;
         if (!meta) return null;
         const val = Number(meta.regularMarketPrice?.toFixed(2) || 0);
-        const prev = Number(meta.chartPreviousClose?.toFixed(2) || val);
+        // FIX: chartPreviousClose on a 5d range is the close BEFORE the window,
+        // not yesterday. Prefer the true regular previous close / last daily close.
+        const closes: number[] = (result?.indicators?.quote?.[0]?.close || []).filter(
+          (c: number | null): c is number => c !== null && c !== undefined
+        );
+        const secondLast = closes.length >= 2 ? closes[closes.length - 2] : undefined;
+        const prev = Number(
+          (meta.regularMarketPreviousClose ?? meta.previousClose ?? secondLast ?? meta.chartPreviousClose ?? val).toFixed(2)
+        );
         const chg = Number((val - prev).toFixed(2));
         const chgPct = prev ? Number(((chg / prev) * 100).toFixed(2)) : 0;
         return {
           symbol: s,
-          name: s === '^NSEI' ? 'NIFTY 50' : s === '^BSESN' ? 'SENSEX' : 'BANK NIFTY',
+          name: indexNames[s] || s,
           currentValue: val,
           change: chg,
           changePercent: chgPct,

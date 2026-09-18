@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+/* --- Accessibility & mobile UX baseline --------------------------------- */
+
+/*
+ * Prevent mobile browsers (iOS Safari especially) from auto-zooming when a
+ * form field is focused. That zoom-on-focus is triggered by any control with a
+ * font-size below 16px, and the app uses text-xs (12px) inputs. Forcing 16px on
+ * touch/small screens stops the zoom without changing the desktop look.
+ */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/*
+ * Restore a visible keyboard-focus indicator. Many components use
+ * `focus:outline-none`; this brings back an accessible ring for keyboard/switch
+ * users (focus-visible only, so it doesn't show on mouse clicks).
+ */
+:focus-visible {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}

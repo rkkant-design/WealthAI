@@ -30,6 +30,8 @@ router.post("/copilot", async (req, res) => {
         config: {
           systemInstruction: COPILOT_SYSTEM_INSTRUCTION,
           temperature: 0.35,
+          // Keeps generation within the serverless (~10s) function timeout.
+          maxOutputTokens: 900,
         },
       });
       text = response.text || "";
@@ -41,6 +43,7 @@ router.post("/copilot", async (req, res) => {
         config: {
           systemInstruction: COPILOT_SYSTEM_INSTRUCTION,
           temperature: 0.35,
+          maxOutputTokens: 900,
         },
       });
       text = fallbackResponse.text || "";

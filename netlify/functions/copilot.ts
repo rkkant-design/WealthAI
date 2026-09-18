@@ -28,7 +28,8 @@ export default async (req: Request): Promise<Response> => {
       const response = await ai.models.generateContent({
         model: CONFIG.GEMINI_MODEL,
         contents,
-        config: { systemInstruction: COPILOT_SYSTEM_INSTRUCTION, temperature: 0.35 },
+        // maxOutputTokens keeps generation under the serverless (~10s) timeout.
+        config: { systemInstruction: COPILOT_SYSTEM_INSTRUCTION, temperature: 0.35, maxOutputTokens: 900 },
       });
       text = response.text || "";
     } catch (modelErr: any) {
@@ -36,7 +37,7 @@ export default async (req: Request): Promise<Response> => {
       const fallbackResponse = await ai.models.generateContent({
         model: CONFIG.GEMINI_FALLBACK_MODEL,
         contents,
-        config: { systemInstruction: COPILOT_SYSTEM_INSTRUCTION, temperature: 0.35 },
+        config: { systemInstruction: COPILOT_SYSTEM_INSTRUCTION, temperature: 0.35, maxOutputTokens: 900 },
       });
       text = fallbackResponse.text || "";
     }

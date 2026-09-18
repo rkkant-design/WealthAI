@@ -102,8 +102,8 @@ interface WealthContextType {
     currentValue: number;
     totalGain: number;
     gainPercent: number;
-    xirr: number;
-    healthScore: number;
+    xirr: number | null;
+    healthScore: number | null;
     largestHoldingPercent: number;
     largestSectorPercent: number;
     largestSectorName: string;
@@ -602,21 +602,36 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     });
 
-    // Health score computation (Deduct for overconcentration or weakening thesis)
+    // Health score: only meaningful once there are holdings. Deduct for
+    // overconcentration or weakening thesis. Null when the portfolio is empty.
     let healthScore = 90;
     if (bankingExposurePercent > 40) healthScore -= 8;
     if (largestHoldingPercent > 25) healthScore -= 5;
     const weakeningCount = portfolioWithCalculations.filter((p) => p.thesisStatus === 'WEAKENING').length;
     healthScore -= weakeningCount * 7;
     healthScore = Math.max(40, Math.min(98, healthScore));
+    const healthScoreVal: number | null = portfolioWithCalculations.length === 0 ? null : healthScore;
+
+    // Annualized return, derived from actual invested value vs current value over
+    // the real holding period. Null (not a fabricated number) when nothing is held.
+    let xirr: number | null = null;
+    if (totalInvested > 0 && currentValue > 0) {
+      const now = Date.now();
+      const times = portfolioWithCalculations
+        .map((p) => new Date(p.purchaseDate).getTime())
+        .filter((t) => !Number.isNaN(t));
+      const earliest = times.length ? Math.min(...times) : now;
+      const years = Math.max(0.08, (now - earliest) / (365.25 * 24 * 3600 * 1000));
+      xirr = Number(((Math.pow(currentValue / totalInvested, 1 / years) - 1) * 100).toFixed(1));
+    }
 
     return {
       totalInvested,
       currentValue,
       totalGain,
       gainPercent,
-      xirr: 17.8, // Institutional XIRR calculation
-      healthScore,
+      xirr,
+      healthScore: healthScoreVal,
       largestHoldingPercent,
       largestSectorPercent,
       largestSectorName,

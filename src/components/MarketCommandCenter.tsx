@@ -137,7 +137,11 @@ export const MarketCommandCenter: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Your Portfolio</span>
-            <span className="font-bold text-emerald-300">Healthy (84/100)</span>
+            <span className="font-bold text-emerald-300">
+              {portfolioStats.healthScore === null
+                ? 'No holdings yet'
+                : `${portfolioStats.healthScore >= 80 ? 'Healthy' : 'Review'} (${portfolioStats.healthScore}/100)`}
+            </span>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Best Action</span>
@@ -145,7 +149,7 @@ export const MarketCommandCenter: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Monthly Budget</span>
-            <span className="font-bold text-white font-mono">₹15,000</span>
+            <span className="font-bold text-white font-mono">₹{investorProfile.monthlyBudget.toLocaleString('en-IN')}</span>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Deploy Now</span>
@@ -161,7 +165,9 @@ export const MarketCommandCenter: React.FC = () => {
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-rose-900/40">
             <span className="text-[10px] text-rose-400 block mb-0.5">Requires Review</span>
-            <span className="font-bold text-rose-300">Apex Specialty</span>
+            <span className="font-bold text-rose-300">
+              {(portfolio.find((p) => p.thesisStatus === 'WEAKENING') || portfolio.find((p) => p.thesisStatus === 'MONITOR'))?.stockSymbol || 'None'}
+            </span>
           </div>
         </div>
       </div>
@@ -247,13 +253,13 @@ export const MarketCommandCenter: React.FC = () => {
                 Portfolio Vitality
               </span>
               <span className="text-xs font-bold text-emerald-400 font-mono">
-                XIRR: {portfolioStats.xirr}%
+                Return: {portfolioStats.xirr === null ? 'N/A' : `${portfolioStats.xirr}%`}
               </span>
             </div>
 
             <div className="flex items-center gap-4 my-4">
               <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex flex-col items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                <span className="text-xl font-black font-mono leading-none">{portfolioStats.healthScore}</span>
+                <span className="text-xl font-black font-mono leading-none">{portfolioStats.healthScore === null ? '—' : portfolioStats.healthScore}</span>
                 <span className="text-[9px] font-semibold text-emerald-100">/ 100</span>
               </div>
               <div>

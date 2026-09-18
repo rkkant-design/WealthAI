@@ -425,7 +425,9 @@ export async function generateStockAnalysis(input: StockAnalysisInput): Promise<
 
   const callModel = async (model: string, ms: number): Promise<string> => {
     const response = await withTimeout(
-      ai.models.generateContent({ model, contents: prompt, config: { temperature: 0.3 } }),
+      // maxOutputTokens bounds the JSON so generation stays well under the
+      // serverless function timeout.
+      ai.models.generateContent({ model, contents: prompt, config: { temperature: 0.3, maxOutputTokens: 2048 } }),
       ms
     );
     return response.text || "";

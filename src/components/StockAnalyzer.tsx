@@ -411,7 +411,11 @@ export const StockAnalyzer: React.FC = () => {
               <h3 className="font-extrabold text-sm text-white">Composite Wealth Score</h3>
             </div>
             <span className="text-xs font-bold text-cyan-400 bg-cyan-950/40 px-2.5 py-0.5 rounded border border-cyan-500/30">
-              Grade A+
+              Grade {currentStock.wealthScore >= 85 ? 'A+'
+                : currentStock.wealthScore >= 75 ? 'A'
+                : currentStock.wealthScore >= 65 ? 'B+'
+                : currentStock.wealthScore >= 55 ? 'B'
+                : currentStock.wealthScore >= 45 ? 'C' : 'D'}
             </span>
           </div>
 
@@ -429,7 +433,7 @@ export const StockAnalyzer: React.FC = () => {
                   : 'Cautionary / Cyclical Asset'}
               </p>
               <p className="text-slate-400 text-[11px] leading-tight">
-                Evaluated across 9 audited fundamental, valuation, entry, and portfolio fit parameters.
+                Evaluated across 9 fundamental, valuation, entry, and portfolio-fit parameters (AI-estimated).
               </p>
             </div>
           </div>

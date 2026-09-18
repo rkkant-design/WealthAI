@@ -1,12 +1,12 @@
 {
-  "projectId": "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID",
-  "appId": "REPLACE_WITH_YOUR_WEB_APP_ID",
-  "apiKey": "REPLACE_WITH_YOUR_WEB_API_KEY",
-  "authDomain": "REPLACE_WITH_YOUR_PROJECT.firebaseapp.com",
+  "projectId": "aiwealthstudio-94163",
+  "appId": "1:41060353104:web:304d36f318c2e9166bbd55",
+  "apiKey": "AIzaSyCD3zWJMCt0wmxd6l-OwiT0CNZ_LF4tCyc",
+  "authDomain": "aiwealthstudio-94163.firebaseapp.com",
   "firestoreDatabaseId": "(default)",
-  "storageBucket": "REPLACE_WITH_YOUR_PROJECT.firebasestorage.app",
-  "messagingSenderId": "REPLACE_WITH_YOUR_SENDER_ID",
-  "measurementId": "",
-  "oAuthClientId": "REPLACE_WITH_YOUR_OAUTH_CLIENT_ID",
+  "storageBucket": "aiwealthstudio-94163.firebasestorage.app",
+  "messagingSenderId": "41060353104",
+  "measurementId": "G-9WGVG4E71K",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }

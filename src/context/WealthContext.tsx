@@ -41,6 +41,12 @@ import {
 } from '../data/mockData';
 import { extendedStocks, lookupOrGenerateStock } from '../data/allStocksData';
 
+// Older builds seeded every account with a sample watchlist; drop those entries.
+const SAMPLE_WATCHLIST_KEYS = new Set(initialWatchlist.map((w) => `${w.symbol}|${w.addedDate}`));
+function withoutSampleWatchlist(list: WatchlistItem[]): WatchlistItem[] {
+  return list.filter((w) => !SAMPLE_WATCHLIST_KEYS.has(`${w.symbol}|${w.addedDate}`));
+}
+
 interface WealthContextType {
   investorProfile: InvestorProfile;
   updateInvestorProfile: (profile: Partial<InvestorProfile>) => void;
@@ -177,14 +183,19 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return saved ? JSON.parse(saved) : initialPortfolio;
   });
 
+  // New users start with an empty watchlist and no alerts. Older builds seeded
+  // both with sample entries; strip those out of saved data so they don't
+  // masquerade as the user's own items.
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => {
     const saved = localStorage.getItem('wealthpilot_watchlist');
-    return saved ? JSON.parse(saved) : initialWatchlist;
+    return saved ? withoutSampleWatchlist(JSON.parse(saved)) : [];
   });
 
   const [alerts, setAlerts] = useState<AlertItem[]>(() => {
     const saved = localStorage.getItem('wealthpilot_alerts');
-    return saved ? JSON.parse(saved) : initialAlerts;
+    if (!saved) return [];
+    const sampleIds = new Set(initialAlerts.map((a) => a.id));
+    return (JSON.parse(saved) as AlertItem[]).filter((a) => !sampleIds.has(a.id));
   });
 
   const [stocks, setStocks] = useState<Stock[]>(() => {
@@ -318,8 +329,9 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         if (cloudWatchlist !== null) {
-          setWatchlist(cloudWatchlist);
-          localStorage.setItem('wealthpilot_watchlist', JSON.stringify(cloudWatchlist));
+          const cleanWatchlist = withoutSampleWatchlist(cloudWatchlist);
+          setWatchlist(cleanWatchlist);
+          localStorage.setItem('wealthpilot_watchlist', JSON.stringify(cleanWatchlist));
         } else {
           saveWatchlistToFirestore(uid, watchlist);
         }

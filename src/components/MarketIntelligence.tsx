@@ -16,6 +16,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useWealth } from '../context/WealthContext';
+import { SampleDataNotice, SampleBadge } from './SampleDataNotice';
 
 export const MarketIntelligence: React.FC = () => {
   const { marketIndices, macroIndicators, marketRegime, setActiveTab } = useWealth();
@@ -38,7 +39,7 @@ export const MarketIntelligence: React.FC = () => {
             India Market Intelligence
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Real-time macroeconomic context, monetary policy, institutional capital flows, and global drivers.
+            Macroeconomic context, monetary policy, institutional capital flows and global drivers.
           </p>
         </div>
 
@@ -80,6 +81,11 @@ export const MarketIntelligence: React.FC = () => {
         </div>
       </div>
 
+      <SampleDataNotice>
+        Everything on this page (institutional flows, economic indicators and global factors) is fixed example
+        data. It is not updated and may be months out of date. For live index levels, see the Dashboard.
+      </SampleDataNotice>
+
       {/* Market Overview Section */}
       {activeSubTab === 'overview' && (
         <div className="space-y-6">
@@ -96,7 +102,7 @@ export const MarketIntelligence: React.FC = () => {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-slate-400 block">Today's Net Buying</span>
+                  <span className="text-xs text-slate-400 block">Net buying (example)</span>
                   <span className="text-2xl font-black text-emerald-400 font-mono">+₹1,850 Cr</span>
                 </div>
                 <div className="text-right">
@@ -175,7 +181,7 @@ export const MarketIntelligence: React.FC = () => {
               <Landmark className="h-5 w-5 text-emerald-400" />
               <h3 className="font-bold text-sm text-white">Indian Domestic Macroeconomic Fundamentals</h3>
             </div>
-            <span className="text-xs text-slate-400 font-mono">Source: RBI / MOSPI / MoF</span>
+            <SampleBadge />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -214,7 +220,7 @@ export const MarketIntelligence: React.FC = () => {
               <Globe2 className="h-5 w-5 text-cyan-400" />
               <h3 className="font-bold text-sm text-white">Global Macro Transmission to Indian Equities</h3>
             </div>
-            <span className="text-xs text-slate-400 font-mono">Source: Federal Reserve / IMF / Bloomberg</span>
+            <SampleBadge />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

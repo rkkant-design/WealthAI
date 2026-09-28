@@ -402,29 +402,41 @@ export const MyPortfolio: React.FC = () => {
               </span>
             </div>
 
-            {/* Warning Callout */}
-            <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 my-3 space-y-1.5">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
-                <AlertTriangle className="h-4 w-4" /> Banking Concentration Above 35% Limit
-              </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Your portfolio holds <strong className="text-white">57.5%</strong> in Indian Financials (HDFC Bank & ICICI Bank). While both are blue-chip compounders, high concentration exposes your capital to systemic credit-cycle volatility.
-              </p>
-            </div>
+            {/* Guidance is driven by the user's actual banking weight, not fixed text. */}
+            {portfolioStats.bankingExposurePercent > 35 ? (
+              <>
+                <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 my-3 space-y-1.5">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                    <AlertTriangle className="h-4 w-4" /> Banking concentration above 35%
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    <strong className="text-white">{portfolioStats.bankingExposurePercent}%</strong> of your portfolio is in banking and financials.
+                    High concentration in one sector makes your portfolio more sensitive to that sector's ups and downs.
+                  </p>
+                </div>
 
-            <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/40 text-xs text-slate-300 space-y-1">
-              <span className="text-blue-300 font-bold block flex items-center gap-1.5">
-                <Info className="h-3.5 w-3.5" /> AI Recommended Rebalancing Strategy:
-              </span>
-              <p className="text-[11px] leading-relaxed">
-                Do not panic-sell HDFC Bank or ICICI Bank. Instead, direct your upcoming <strong>₹15,000/month</strong> investment allocations entirely into underrepresented defensive sectors: <strong>IT & Software (TCS), Pharma (Sun Pharma), and Broad Market ETFs (NIFTYBEES)</strong>.
+                <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/40 text-xs text-slate-300 space-y-1">
+                  <span className="text-blue-300 font-bold block flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5" /> A common approach
+                  </span>
+                  <p className="text-[11px] leading-relaxed">
+                    Rather than selling, some investors direct new monthly investments (your budget is{' '}
+                    <strong>₹{investorProfile.monthlyBudget.toLocaleString('en-IN')}/month</strong>) into sectors they're
+                    underweight in until the balance improves. This is general information, not personalised advice.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-slate-400 my-3 leading-relaxed">
+                {portfolio.length === 0
+                  ? 'Add investments to see how concentrated your portfolio is.'
+                  : 'Your banking weight is within the 35% guideline.'}
               </p>
-            </div>
+            )}
           </div>
 
-          <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-            <span>Market Cap: <strong>88% Large Cap • 12% Mid Cap</strong></span>
-            <span>Target Concentration per stock: <strong>&le; 20%</strong></span>
+          <div className="pt-3 border-t border-slate-800 text-xs text-slate-400">
+            <span>Target concentration per stock: <strong>&le; 20%</strong></span>
           </div>
         </div>
       </div>

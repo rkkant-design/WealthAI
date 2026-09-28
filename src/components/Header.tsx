@@ -29,8 +29,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
   const { 
     stocks, 
     setSelectedStockSymbol, 
-    marketRegime, 
-    setIsDailyBriefingOpen, 
+    marketDataLive,
+    setIsDailyBriefingOpen,
     setIsAddInvestmentOpen,
     unreadAlertCount,
     setActiveTab,
@@ -127,10 +127,20 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono text-[10px] font-bold flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-            Live NSE/BSE Market Data Connected
-          </span>
+          {marketDataLive ? (
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono text-[10px] font-bold flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+              Live market data connected
+            </span>
+          ) : (
+            <span
+              title="The live market feed hasn't responded yet. Index figures may be sample values."
+              className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 font-mono text-[10px] font-bold flex items-center gap-1.5"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              Live data unavailable
+            </span>
+          )}
         </div>
       </div>
 
@@ -147,19 +157,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Quick Market Regime Pill */}
-          <button
-            id="header-regime-pill"
-            onClick={() => setActiveTab('market')}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 transition-all text-xs font-semibold"
-          >
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-slate-400 text-[11px]">Regime:</span>
-            <span className="text-emerald-300 font-bold">{marketRegime.status}</span>
-            <span className="text-slate-400 font-mono text-[10px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">
-              {marketRegime.confidence}%
-            </span>
-          </button>
         </div>
 
         {/* Global Search Bar */}
@@ -211,6 +208,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
                 <span className="text-[10px] text-slate-400 hidden sm:inline">
                   Press <kbd className="px-1 py-0.5 bg-slate-800 rounded text-slate-300 font-mono text-[9px] border border-slate-700">Enter ↵</kbd> to analyze
                 </span>
+              </div>
+              <div className="px-2.5 py-1.5 bg-amber-500/5 border-b border-slate-800 text-[10px] text-amber-300/90">
+                Prices in this list may be out of date. Open a stock to see its live price.
               </div>
 
               {/* Popular Benchmark Pills if query is empty */}

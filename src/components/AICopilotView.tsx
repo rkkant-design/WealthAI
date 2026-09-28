@@ -21,7 +21,7 @@ interface Message {
 }
 
 export const AICopilotView: React.FC = () => {
-  const { investorProfile, portfolio, marketIndices, marketRegime, portfolioStats } = useWealth();
+  const { investorProfile, portfolio, marketIndices, marketDataLive, portfolioStats } = useWealth();
   const firstName = (investorProfile.name || 'Investor').split(' ')[0];
 
   // Build the greeting from the REAL account state, not a fictional portfolio.
@@ -43,7 +43,7 @@ export const AICopilotView: React.FC = () => {
 Here's what I'm working with:
 - **Profile:** ${investorProfile.riskProfile} Risk • ${investorProfile.investmentHorizon} • Monthly Budget ₹${budgetStr}
 - ${portfolioLine}
-- **Market:** NSE India (NIFTY ${niftyStr}) • Regime: ${marketRegime.status} (${marketRegime.confidence}% Confidence)
+- **Market:** NSE India (NIFTY ${niftyStr}${marketDataLive ? ', live' : ', sample value'})
 
 Ask me anything about stock entry timing, valuation multiples, portfolio risk, or where to deploy your monthly capital.`,
       timestamp: 'Just now',
@@ -55,11 +55,10 @@ Ask me anything about stock entry timing, valuation multiples, portfolio risk, o
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const promptChips = [
-    'Where should I invest my ₹15,000 this month?',
-    'Should I buy Reliance now?',
-    'Why shouldn\'t I buy Titan at current levels?',
-    'Why are you recommending holding Asian Paints despite -8% drop?',
-    'Which stock in my portfolio needs an immediate review?',
+    `How should I think about investing ₹${budgetStr} this month?`,
+    'What should I check before buying Reliance?',
+    'How do I tell if a stock like Titan is expensive?',
+    'Which stock in my portfolio needs a review?',
     'Am I overexposed to banking?',
     'Explain my portfolio like I\'m 15 years old.',
     'What should I do if NIFTY falls 20%?',
@@ -96,8 +95,10 @@ Ask me anything about stock entry timing, valuation multiples, portfolio risk, o
           context: {
             investorProfile,
             portfolio,
+            // Only real data goes to the AI. Index values are flagged when they
+            // are the fallback sample rather than the live feed.
             marketIndices,
-            marketRegime,
+            marketIndicesAreLive: marketDataLive,
             portfolioStats,
             history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
           },

@@ -16,12 +16,85 @@ import {
   Info
 } from 'lucide-react';
 import { useWealth } from '../context/WealthContext';
+import { SampleDataNotice, SampleBadge } from './SampleDataNotice';
+import { LiveBadge, formatQuoteValue } from './LiveMarketWidgets';
+import { MarketPulse } from '../types';
+
+const TONE: Record<string, string> = {
+  Uptrend: 'text-emerald-400',
+  Positive: 'text-emerald-400',
+  Low: 'text-emerald-400',
+  Sideways: 'text-slate-200',
+  Mixed: 'text-slate-200',
+  Normal: 'text-slate-200',
+  Downtrend: 'text-rose-400',
+  Negative: 'text-rose-400',
+  High: 'text-amber-400',
+  Unknown: 'text-slate-500',
+};
+
+/** Market reading calculated from live data (see server/services/marketPulseService.ts for the rules). */
+const LiveRegimePanel: React.FC<{ pulse: MarketPulse; onOpenMarket: () => void }> = ({ pulse, onOpenMarket }) => {
+  const regime = pulse.regime!;
+  const usdInr = pulse.global.find((q) => q.symbol === 'INR=X');
+  const brent = pulse.global.find((q) => q.symbol === 'BZ=F');
+
+  const tiles: { label: string; value: string; tone: string }[] = [
+    { label: 'Trend', value: regime.trend, tone: TONE[regime.trend] },
+    { label: 'Volatility', value: regime.vix !== null ? `${regime.volatility} (VIX ${regime.vix})` : regime.volatility, tone: TONE[regime.volatility] },
+    { label: 'Sectors up today', value: `${regime.sectorsUp} of ${regime.sectorsTotal}`, tone: TONE[regime.breadth] },
+  ];
+  if (usdInr) tiles.push({ label: 'USD / INR', value: formatQuoteValue(usdInr), tone: 'text-slate-200' });
+  if (brent) tiles.push({ label: 'Brent crude', value: formatQuoteValue(brent), tone: 'text-slate-200' });
+
+  return (
+    <div className="lg:col-span-2 p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            Market today <LiveBadge asOf={pulse.asOf} />
+          </span>
+          <h2 className={`text-xl sm:text-2xl font-black mt-1 ${TONE[regime.trend]}`}>
+            {regime.trend === 'Uptrend' ? 'Uptrend' : regime.trend === 'Downtrend' ? 'Downtrend' : 'Moving sideways'}
+          </h2>
+        </div>
+        <button
+          id="view-market-analysis-btn"
+          onClick={onOpenMarket}
+          className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+        >
+          <span>View Market Analysis</span>
+          <ArrowRight className="h-3.5 w-3.5 text-blue-400" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center text-xs">
+        {tiles.map((t) => (
+          <div key={t.label} className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <span className="text-[10px] text-slate-400 block">{t.label}</span>
+            <span className={`font-bold font-mono ${t.tone}`}>{t.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/40">
+        <p className="text-sm text-slate-300 leading-relaxed">{regime.summary}</p>
+        <p className="text-[11px] text-slate-500 mt-2">
+          Calculated automatically from live prices: trend compares NIFTY 50 with its 50-day average (±2%), volatility
+          uses India VIX, and breadth counts NSE sector indices up today. This describes the market; it is not advice.
+        </p>
+      </div>
+    </div>
+  );
+};
 
 export const MarketCommandCenter: React.FC = () => {
-  const { 
-    investorProfile, 
-    marketIndices, 
-    marketRegime, 
+  const {
+    investorProfile,
+    marketIndices,
+    marketDataLive,
+    marketPulse,
+    marketRegime,
     portfolioStats, 
     monthlyPlan, 
     setActiveTab, 
@@ -32,6 +105,8 @@ export const MarketCommandCenter: React.FC = () => {
   } = useWealth();
 
   const apexChemHolding = portfolio.find((p) => p.stockSymbol === 'APEXCHEM') || portfolio[portfolio.length - 1];
+  const planTotal = monthlyPlan.reduce((sum, item) => sum + item.amount, 0);
+  const hasHoldings = portfolioStats.healthScore !== null;
 
   return (
     <div id="market-command-center" className="space-y-6 animate-in fade-in duration-300">
@@ -39,9 +114,8 @@ export const MarketCommandCenter: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-              Live Advisory Session • NSE India
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
+              NSE & BSE • Research dashboard
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -70,8 +144,12 @@ export const MarketCommandCenter: React.FC = () => {
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
             Key NSE Benchmarks & Volatility
           </span>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-            Demo Market Data
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+            marketDataLive
+              ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'
+              : 'bg-slate-800 text-slate-400 border-slate-700'
+          }`}>
+            {marketDataLive ? 'Live NSE/BSE' : 'Sample data'}
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -121,59 +199,49 @@ export const MarketCommandCenter: React.FC = () => {
             </h2>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
-            Personalized for Kamal
+            Personalized for {investorProfile.name}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-center text-xs">
-          <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
-            <span className="text-[10px] text-slate-400 block mb-0.5">Market Regime</span>
-            <span className="font-bold text-emerald-400">Cautious Positive</span>
-          </div>
+        {/* Only real, user-specific figures here. Fixed "recommendations" (regime,
+            best action, deploy amounts, top opportunity) were removed. */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center text-xs">
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Your Portfolio</span>
-            <span className="font-bold text-emerald-300">Healthy (84/100)</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
-            <span className="text-[10px] text-slate-400 block mb-0.5">Best Action</span>
-            <span className="font-bold text-blue-400">Accumulation</span>
+            <span className="font-bold text-emerald-300">
+              {portfolioStats.healthScore === null
+                ? 'No holdings yet'
+                : `${portfolioStats.healthScore >= 80 ? 'Healthy' : 'Review'} (${portfolioStats.healthScore}/100)`}
+            </span>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
             <span className="text-[10px] text-slate-400 block mb-0.5">Monthly Budget</span>
-            <span className="font-bold text-white font-mono">₹15,000</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
-            <span className="text-[10px] text-slate-400 block mb-0.5">Deploy Now</span>
-            <span className="font-bold text-emerald-400 font-mono">₹12,000</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
-            <span className="text-[10px] text-slate-400 block mb-0.5">Tactical Wait</span>
-            <span className="font-bold text-amber-400 font-mono">₹3,000</span>
-          </div>
-          <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
-            <span className="text-[10px] text-slate-400 block mb-0.5">Top Opportunity</span>
-            <span className="font-bold text-cyan-300">TCS / Sun Pharma</span>
+            <span className="font-bold text-white font-mono">₹{investorProfile.monthlyBudget.toLocaleString('en-IN')}</span>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950/70 border border-rose-900/40">
             <span className="text-[10px] text-rose-400 block mb-0.5">Requires Review</span>
-            <span className="font-bold text-rose-300">Apex Specialty</span>
+            <span className="font-bold text-rose-300">
+              {(portfolio.find((p) => p.thesisStatus === 'WEAKENING') || portfolio.find((p) => p.thesisStatus === 'MONITOR'))?.stockSymbol || 'None'}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Hero Market Regime Section (Section 6) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left 2 Cols: Large Market Regime Hero */}
+        {/* Left 2 Cols: Market reading — live when available, otherwise the labelled sample */}
+        {marketPulse?.regime ? (
+          <LiveRegimePanel pulse={marketPulse} onOpenMarket={() => setActiveTab('market')} />
+        ) : (
         <div className="lg:col-span-2 p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Current NSE India Environment
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                Market environment <SampleBadge />
               </span>
               <div className="flex items-center gap-3 mt-1">
                 <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/50 animate-pulse" />
-                  🟢 {marketRegime.status}
+                  {marketRegime.status}
                 </h2>
                 <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-mono font-bold">
                   Confidence: {marketRegime.confidence}%
@@ -190,6 +258,10 @@ export const MarketCommandCenter: React.FC = () => {
               <ArrowRight className="h-3.5 w-3.5 text-blue-400" />
             </button>
           </div>
+
+          <SampleDataNotice>
+            This market reading, its indicators and the view below are fixed examples. They don't reflect today's market.
+          </SampleDataNotice>
 
           {/* 7 Supporting Indicators Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center text-xs">
@@ -226,13 +298,14 @@ export const MarketCommandCenter: React.FC = () => {
           {/* AI Market View Box */}
           <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/40 relative">
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5 mb-1.5">
-              <Sparkles className="h-3.5 w-3.5" /> AI Market View for Kamal
+              <Sparkles className="h-3.5 w-3.5" /> Example market view
             </span>
             <p className="text-xs text-slate-300 leading-relaxed italic">
               "{marketRegime.aiMarketView}"
             </p>
           </div>
         </div>
+        )}
 
         {/* Right Col: Portfolio Health Gauge */}
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-4 shadow-xl">
@@ -242,17 +315,21 @@ export const MarketCommandCenter: React.FC = () => {
                 Portfolio Vitality
               </span>
               <span className="text-xs font-bold text-emerald-400 font-mono">
-                XIRR: {portfolioStats.xirr}%
+                Return: {portfolioStats.xirr === null ? 'N/A' : `${portfolioStats.xirr}%`}
               </span>
             </div>
 
             <div className="flex items-center gap-4 my-4">
               <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex flex-col items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                <span className="text-xl font-black font-mono leading-none">{portfolioStats.healthScore}</span>
+                <span className="text-xl font-black font-mono leading-none">{portfolioStats.healthScore === null ? '—' : portfolioStats.healthScore}</span>
                 <span className="text-[9px] font-semibold text-emerald-100">/ 100</span>
               </div>
               <div>
-                <h3 className="font-bold text-sm text-white">Overall Health: Strong</h3>
+                <h3 className="font-bold text-sm text-white">
+                  {!hasHoldings
+                    ? 'No holdings yet'
+                    : `Overall Health: ${portfolioStats.healthScore! >= 80 ? 'Strong' : portfolioStats.healthScore! >= 60 ? 'Fair' : 'Needs review'}`}
+                </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Portfolio Value: <strong className="text-white font-mono">₹{portfolioStats.currentValue.toLocaleString('en-IN')}</strong>
                 </p>
@@ -273,9 +350,11 @@ export const MarketCommandCenter: React.FC = () => {
                   style={{ width: `${Math.min(100, portfolioStats.bankingExposurePercent)}%` }} 
                 />
               </div>
-              <p className="text-[10px] text-slate-400 italic">
-                ⚠️ Financials are above 35% cap. Deploy new capital into IT & Healthcare.
-              </p>
+              {portfolioStats.bankingExposurePercent > 35 && (
+                <p className="text-[10px] text-slate-400 italic">
+                  ⚠️ Banking is above 35% of your portfolio. Consider spreading new money across other sectors.
+                </p>
+              )}
             </div>
           </div>
 
@@ -294,17 +373,19 @@ export const MarketCommandCenter: React.FC = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-              What should you do today?
+            <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              The five action categories <SampleBadge />
             </h2>
             <p className="text-xs text-slate-400">
-              Clear, disciplined actions matched specifically to your ₹15K budget and risk profile.
+              How WealthPilot sorts ideas: Buy, Accumulate, Watch, Hold and Review.
             </p>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 hidden sm:inline">
-            5 Action Categories
-          </span>
         </div>
+
+        <SampleDataNotice>
+          The stocks named in these cards are fixed examples that explain each category. They are not
+          recommendations for you and are not based on your portfolio or today's prices.
+        </SampleDataNotice>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* 1. BUY */}
@@ -406,7 +487,7 @@ export const MarketCommandCenter: React.FC = () => {
           {/* 5. REVIEW */}
           <div
             id="action-card-review"
-            onClick={() => openReviewModal(apexChemHolding)}
+            onClick={() => (apexChemHolding ? openReviewModal(apexChemHolding) : setActiveTab('portfolio'))}
             className="p-4 rounded-xl bg-slate-900 border border-rose-500/40 hover:border-rose-400 hover:bg-rose-950/20 cursor-pointer transition-all shadow-md group"
           >
             <div className="flex items-center justify-between mb-2">
@@ -436,14 +517,12 @@ export const MarketCommandCenter: React.FC = () => {
             <div className="flex items-center gap-2">
               <Target className="h-4 w-4 text-blue-400" />
               <h2 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
-                Your Monthly ₹15,000 Investment Plan
+                Example monthly plan
               </h2>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Current Cycle
-              </span>
+              <SampleBadge />
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Available Budget: <strong className="text-white font-mono">₹15,000</strong> • AI Recommended Deployment: <strong className="text-emerald-400 font-mono">₹12,000</strong>
+              Your monthly budget: <strong className="text-white font-mono">₹{investorProfile.monthlyBudget.toLocaleString('en-IN')}</strong>
             </p>
           </div>
 
@@ -456,6 +535,10 @@ export const MarketCommandCenter: React.FC = () => {
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
+
+        <SampleDataNotice>
+          This plan uses a fixed list of example stocks. It is not personalised advice and does not use live prices.
+        </SampleDataNotice>
 
         {/* Plan Table */}
         <div className="overflow-x-auto">
@@ -504,7 +587,7 @@ export const MarketCommandCenter: React.FC = () => {
                   Total Monthly Capital Allocation:
                 </td>
                 <td className="pt-3 text-right font-mono font-black text-emerald-400 text-sm">
-                  ₹15,000
+                  ₹{planTotal.toLocaleString('en-IN')}
                 </td>
                 <td className="pt-3 pl-4 text-[10px] text-slate-400 italic">
                   💡 "You don't have to invest the entire amount if attractive entry points are unavailable."

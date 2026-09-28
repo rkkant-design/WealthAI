@@ -1,3 +1,6 @@
+import { Stock, RecommendationType } from "../../src/types.js";
+import { generateStockAnalysis, StockAnalysisInput } from "./stockAnalysisService.js";
+
 // Alias dictionary for common Indian stocks & penny stocks
 export const KNOWN_INDIAN_STOCKS: Record<string, { symbol: string; name: string; sector: string; isPenny?: boolean; approxMcap?: string }> = {
   RADAAN: { symbol: 'RADAAN', name: 'Radaan Mediaworks India Limited', sector: 'Media & Entertainment', isPenny: true, approxMcap: '₹18 Cr' },
@@ -22,10 +25,15 @@ export const KNOWN_INDIAN_STOCKS: Record<string, { symbol: string; name: string;
   TATAMOTORS: { symbol: 'TATAMOTORS', name: 'Tata Motors Limited', sector: 'Automobile', approxMcap: '₹3.4 Lakh Cr' },
 };
 
-export async function resolveStockQuote(queryParam: string) {
+export async function resolveStockQuote(queryParam: string): Promise<{
+  exchange: 'NSE' | 'BSE';
+  baseSymbol: string;
+  matchedSymbol: string;
+  stock: Stock;
+} | null> {
   const cleanUpper = queryParam.trim().toUpperCase();
-  const known = KNOWN_INDIAN_STOCKS[cleanUpper] || 
-    KNOWN_INDIAN_STOCKS[cleanUpper.replace(/\s+/g, ' ')] || 
+  const known = KNOWN_INDIAN_STOCKS[cleanUpper] ||
+    KNOWN_INDIAN_STOCKS[cleanUpper.replace(/\s+/g, ' ')] ||
     KNOWN_INDIAN_STOCKS[cleanUpper.replace(/AA/g, 'A')];
 
   let candidateTickers: string[] = [];
@@ -92,13 +100,8 @@ export async function resolveStockQuote(queryParam: string) {
   const baseSymbol = matchedSymbol.replace(/\.(NS|BO)$/, "");
   const companyName = meta.longName || meta.shortName || known?.name || baseSymbol;
   const currentPrice = Number(meta.regularMarketPrice.toFixed(2));
-  const prevClose = meta.chartPreviousClose ? Number(meta.chartPreviousClose.toFixed(2)) : currentPrice;
-  const change = Number((currentPrice - prevClose).toFixed(2));
-  const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
-  const week52High = meta.fiftyTwoWeekHigh ? Number(meta.fiftyTwoWeekHigh.toFixed(2)) : Number((currentPrice * 1.3).toFixed(2));
-  const week52Low = meta.fiftyTwoWeekLow ? Number(meta.fiftyTwoWeekLow.toFixed(2)) : Number((currentPrice * 0.7).toFixed(2));
 
-  // Historical closes for chart
+  // Historical closes for chart (compute before prevClose so we can use it as a fallback)
   const timestamps: number[] = foundData.timestamp || [];
   const quoteCloses: (number | null)[] = foundData.indicators?.quote?.[0]?.close || [];
   const historicalCloses = timestamps
@@ -108,147 +111,90 @@ export async function resolveStockQuote(queryParam: string) {
     }))
     .filter((item): item is { date: string; close: number } => item.close !== null);
 
+  // FIX: `chartPreviousClose` on a `range=1y` request is the close a YEAR ago,
+  // which produced absurd "today" changes (e.g. -37%). Use the actual regular
+  // previous close, falling back to the second-to-last daily close.
+  const secondLastClose = historicalCloses.length >= 2
+    ? historicalCloses[historicalCloses.length - 2].close
+    : undefined;
+  const rawPrevClose =
+    meta.regularMarketPreviousClose ??
+    meta.previousClose ??
+    secondLastClose ??
+    meta.chartPreviousClose ??
+    currentPrice;
+  const prevClose = Number(Number(rawPrevClose).toFixed(2));
+  const change = Number((currentPrice - prevClose).toFixed(2));
+  const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
+
+  const week52High = meta.fiftyTwoWeekHigh ? Number(meta.fiftyTwoWeekHigh.toFixed(2)) : Number((currentPrice * 1.3).toFixed(2));
+  const week52Low = meta.fiftyTwoWeekLow ? Number(meta.fiftyTwoWeekLow.toFixed(2)) : Number((currentPrice * 0.7).toFixed(2));
+
   // Penny stock / microcap risk evaluation
   const isPennyStock = currentPrice < 20 || (known?.isPenny ?? false);
   const sector = known?.sector || (companyName.toLowerCase().includes('media') ? 'Media & Entertainment' : 'Diversified');
-  const marketCapCategory = isPennyStock ? 'Penny Stock' : currentPrice > 1000 ? 'Large Cap' : currentPrice > 300 ? 'Mid Cap' : 'Small Cap';
-  const marketCap = known?.approxMcap || (isPennyStock ? `₹${Math.round(currentPrice * 7)} Cr (Microcap)` : `₹${Math.round(currentPrice * 120)} Cr`);
+  const marketCapCategory: Stock['marketCapCategory'] = isPennyStock
+    ? 'Penny Stock'
+    : currentPrice > 1000 ? 'Large Cap' : currentPrice > 300 ? 'Mid Cap' : 'Small Cap';
+  const marketCap = known?.approxMcap || (isPennyStock ? `₹${Math.round(currentPrice * 7)} Cr (Microcap)` : `Not available`);
 
-  const wealthScore = isPennyStock ? Math.min(28, Math.max(16, Math.round(18 + (currentPrice * 2)))) : 76;
-  const recType: 'AVOID' | 'WATCH' | 'ACCUMULATE' | 'BUY' = isPennyStock ? 'AVOID' : 'ACCUMULATE';
-  const overallRisk: 'LOW' | 'MEDIUM' | 'HIGH' = isPennyStock ? 'HIGH' : 'MEDIUM';
-
-  const pennyWarning = isPennyStock 
-    ? `⚠️ High-Risk Penny / Microcap Advisory: ${companyName} trades at ₹${currentPrice} with microcap capitalization. Microcaps carry extreme illiquidity risk, vulnerability to operator pumps, erratic financial reporting, and wide bid-ask spreads. It does NOT meet disciplined long-term wealth preservation criteria.`
+  const pennyWarning = isPennyStock
+    ? `⚠️ High-Risk Penny / Microcap Advisory: ${companyName} trades at ₹${currentPrice}. Microcaps carry extreme illiquidity risk, vulnerability to operator pumps, erratic financial reporting, and wide bid-ask spreads. It does NOT meet disciplined long-term wealth preservation criteria.`
     : undefined;
 
-  return {
-    exchange,
-    baseSymbol,
-    matchedSymbol,
-    stock: {
-      symbol: baseSymbol,
-      name: companyName,
-      sector,
-      marketCap,
-      marketCapCategory,
-      currentPrice,
-      change,
-      changePercent,
-      week52High,
-      week52Low,
-      wealthScore,
-      isPennyStock,
-      isLiveExchangeData: true,
-      exchange,
-      lastUpdatedTime: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      pennyStockWarning: pennyWarning,
-      historicalCloses: historicalCloses.slice(-90),
-      scoreBreakdown: {
-        fundamentalQuality: isPennyStock ? 20 : 78,
-        growth: isPennyStock ? 25 : 75,
-        financialStrength: isPennyStock ? 18 : 80,
-        competitiveAdvantage: isPennyStock ? 15 : 82,
-        management: isPennyStock ? 30 : 76,
-        valuation: isPennyStock ? 35 : 70,
-        marketTrend: isPennyStock ? 22 : 74,
-        entryPoint: isPennyStock ? 16 : 78,
-        portfolioFit: isPennyStock ? 12 : 80,
-      },
-      fundamentals: {
-        revenueGrowth5Yr: isPennyStock ? 'Volatile / Irregular' : '14.2% CAGR',
-        profitGrowth5Yr: isPennyStock ? 'Negative / Cyclical' : '16.5% CAGR',
-        epsGrowth: isPennyStock ? 'Inconsistent' : '15.0% YoY',
-        roe: isPennyStock ? 'Sub-5%' : '18.2%',
-        roce: isPennyStock ? 'Sub-6%' : '19.5%',
-        operatingMargin: isPennyStock ? '4.5%' : '18.0%',
-        debtToEquity: isPennyStock ? '1.45' : '0.15',
-        freeCashFlow: isPennyStock ? 'Negative / Negligible' : '₹1,250 Cr',
-        dividendYield: isPennyStock ? '0.00%' : '1.20%',
-      },
-      financialHistory: [
-        { year: 'FY22', revenue: isPennyStock ? 12 : 2400, profit: isPennyStock ? -2.1 : 320, eps: isPennyStock ? -0.15 : 24.5, roce: isPennyStock ? 3.2 : 18.5, fcf: isPennyStock ? -1.2 : 210, operatingMargin: isPennyStock ? 4.1 : 18.2 },
-        { year: 'FY23', revenue: isPennyStock ? 15 : 2850, profit: isPennyStock ? 0.8 : 390, eps: isPennyStock ? 0.05 : 28.2, roce: isPennyStock ? 4.5 : 19.8, fcf: isPennyStock ? 0.4 : 260, operatingMargin: isPennyStock ? 5.2 : 18.9 },
-        { year: 'FY24', revenue: isPennyStock ? 18 : 3300, profit: isPennyStock ? -1.4 : 460, eps: isPennyStock ? -0.10 : 33.0, roce: isPennyStock ? 2.8 : 20.2, fcf: isPennyStock ? -0.8 : 310, operatingMargin: isPennyStock ? 3.8 : 19.4 },
-        { year: 'FY25', revenue: isPennyStock ? 22 : 3850, profit: isPennyStock ? 0.4 : 540, eps: isPennyStock ? 0.03 : 38.5, roce: isPennyStock ? 4.1 : 21.0, fcf: isPennyStock ? 0.2 : 370, operatingMargin: isPennyStock ? 4.6 : 19.8 },
-        { year: 'FY26E', revenue: isPennyStock ? 25 : 4400, profit: isPennyStock ? 1.1 : 630, eps: isPennyStock ? 0.08 : 44.2, roce: isPennyStock ? 5.0 : 21.8, fcf: isPennyStock ? 0.6 : 430, operatingMargin: isPennyStock ? 5.5 : 20.2 },
-      ],
-      valuationEngine: {
-        currentPe: isPennyStock ? 0 : 22.4,
-        historicalPe5YrAvg: isPennyStock ? 0 : 24.0,
-        sectorPe: 22.0,
-        peg: isPennyStock ? 0 : 1.4,
-        pb: isPennyStock ? 1.2 : 3.8,
-        evEbitda: isPennyStock ? 15.2 : 14.5,
-        dividendYield: isPennyStock ? 0 : 1.2,
-        status: isPennyStock ? 'EXPENSIVE' : 'ATTRACTIVE',
-        explanation: isPennyStock
-          ? `${companyName} is a microcap penny stock trading at ₹${currentPrice}. Inconsistent earnings and lack of institutional coverage expose investors to extreme risk.`
-          : `Sound valuation relative to earnings compounding and ROE sustainability.`,
-      },
-      entryPointEngine: {
-        currentPrice,
-        preferredEntryLow: Number((currentPrice * (isPennyStock ? 0.70 : 0.92)).toFixed(2)),
-        preferredEntryHigh: Number((currentPrice * (isPennyStock ? 0.85 : 1.02)).toFixed(2)),
-        strongBuyZone: Number((currentPrice * (isPennyStock ? 0.60 : 0.85)).toFixed(2)),
-        fairValueEstimate: Number((currentPrice * (isPennyStock ? 0.80 : 1.22)).toFixed(2)),
-        entryRating: recType,
-        entryScore: isPennyStock ? 16 : 82,
-        distanceToPreferredZonePercent: 0,
-        inZone: !isPennyStock,
-        reasons: isPennyStock ? [
-          'Penny stock with high price volatility and low order book depth',
-          'Microcap capital base lacks fundamental institutional safety net',
-          'Severe liquidity risk: exit orders can cause heavy market slippage'
-        ] : [
-          'Trades at attractive entry relative to 52-week peak',
-          'Healthy order visibility and sustained return ratios'
-        ],
-      },
-      recommendation: {
-        type: recType,
-        suggestedAmount: isPennyStock ? 0 : 2000,
-        portfolioFitScore: isPennyStock ? 12 : 82,
-        risk: overallRisk,
-        horizon: isPennyStock ? 'Not Recommended for Long-Term' : '5+ Years',
-        confidence: isPennyStock ? 92 : 84,
-        whyFitsYou: isPennyStock ? [
-          'Does NOT match your medium-risk, 10+ year retirement wealth accumulation strategy',
-          'Capital preservation is critical; penny stocks carry high total loss probabilities'
-        ] : [
-          'Quality business with steady domestic earnings visibility'
-        ],
-        whyNotBuy: isPennyStock ? [
-          'Extreme liquidity risk: daily trade volumes can freeze during corrections',
-          'High bid-ask spread and vulnerability to operator manipulation',
-          'Lacks institutional research coverage, mutual fund ownership, or moat'
-        ] : [
-          'Gradual accumulation is advised during market consolidation'
-        ],
-        whatWouldChangeMind: isPennyStock ? [
-          'Consistent multi-year turnaround in audited operating cash flows and institutional entry'
-        ] : [
-          'Deterioration in operating margins or sudden spike in promoter pledging'
-        ],
-      },
-      riskAnalysis: {
-        overall: overallRisk,
-        businessRisk: isPennyStock ? 88 : 28,
-        valuationRisk: isPennyStock ? 75 : 32,
-        debtRisk: isPennyStock ? 68 : 18,
-        sectorRisk: isPennyStock ? 65 : 24,
-        regulatoryRisk: isPennyStock ? 55 : 22,
-        marketRisk: isPennyStock ? 92 : 30,
-        managementRisk: isPennyStock ? 72 : 18,
-      },
-      investmentThesis: {
-        summary: isPennyStock 
-          ? `${companyName} is a microcap penny stock. Investment in penny stocks is speculative and unsuitable for long-term retirement wealth creation.`
-          : `Established business with dependable earnings compounder dynamics.`,
-        validIf: isPennyStock ? ['Speculative short-term turnaround'] : ['ROCE > 18%', 'Revenue CAGR > 12%'],
-        reconsiderIf: isPennyStock ? ['Any sign of promoter dilution or margin erosion'] : ['Debt expansion or moat loss'],
-      },
-      evidence: [],
-    }
+  // Company-specific fundamental/valuation analysis (AI estimate, NOT audited data).
+  const analysisInput: StockAnalysisInput = {
+    symbol: baseSymbol,
+    name: companyName,
+    sector,
+    currentPrice,
+    changePercent,
+    week52High,
+    week52Low,
+    marketCap,
+    marketCapCategory,
+    isPennyStock,
+    historicalCloses,
   };
+  const analysis = await generateStockAnalysis(analysisInput);
+
+  const stock: Stock = {
+    symbol: baseSymbol,
+    name: companyName,
+    sector,
+    marketCap,
+    marketCapCategory,
+    // Live exchange fields (genuinely from Yahoo Finance):
+    currentPrice,
+    change,
+    changePercent,
+    week52High,
+    week52Low,
+    isLiveExchangeData: true,
+    exchange,
+    lastUpdatedTime: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    isPennyStock,
+    pennyStockWarning: pennyWarning,
+    historicalCloses: historicalCloses.slice(-90),
+    // AI-estimated analysis fields (clearly flagged via analysisSource):
+    analysisSource: analysis.analysisSource,
+    wealthScore: analysis.wealthScore,
+    scoreBreakdown: analysis.scoreBreakdown,
+    fundamentals: analysis.fundamentals,
+    financialHistory: analysis.financialHistory,
+    valuationEngine: analysis.valuationEngine as Stock['valuationEngine'],
+    entryPointEngine: {
+      ...analysis.entryPointEngine,
+      entryRating: analysis.entryPointEngine.entryRating as RecommendationType,
+    },
+    recommendation: {
+      ...analysis.recommendation,
+      type: analysis.recommendation.type as RecommendationType,
+    },
+    riskAnalysis: analysis.riskAnalysis,
+    investmentThesis: analysis.investmentThesis,
+    evidence: [],
+  };
+
+  return { exchange, baseSymbol, matchedSymbol, stock };
 }

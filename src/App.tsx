@@ -1,7 +1,21 @@
-import React, { useState, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, ErrorInfo, ReactNode } from 'react';
 import { WealthProvider, useWealth } from './context/WealthContext';
+import { markTabVisited } from './navigation';
 import { Navigation } from './components/Navigation';
 import { Header } from './components/Header';
+import { PageBreadcrumb } from './components/PageBreadcrumb';
+import { GettingStarted } from './components/GettingStarted';
+import { MobileTabBar } from './components/MobileTabBar';
+import { SampleDataNotice } from './components/SampleDataNotice';
+
+// Pages whose content is still fixed example data (not live, not personalised).
+// Remove an entry once that page is wired to a real source.
+const SAMPLE_DATA_PAGES: Record<string, string> = {
+  opportunities:
+    'This list, its prices, scores and actions come from a fixed example dataset, not live prices. Open a stock in the Stock Analyzer to see its live price.',
+  plan:
+    'This plan is built from a fixed list of example stocks scaled to your budget. It is not personalised advice and does not use live prices.',
+};
 import { MarketCommandCenter } from './components/MarketCommandCenter';
 import { MarketIntelligence } from './components/MarketIntelligence';
 import { SectorIntelligence } from './components/SectorIntelligence';
@@ -73,6 +87,13 @@ const AppContent: React.FC = () => {
   const { activeTab, isLoggedIn, authView, setAuthView } = useWealth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Every page change starts at the top, and is remembered for the
+  // getting-started checklist.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    markTabVisited(activeTab);
+  }, [activeTab]);
+
   if (!isLoggedIn) {
     if (authView === 'login') {
       return <LoginScreen onBackToHome={() => setAuthView('home')} />;
@@ -142,12 +163,21 @@ const AppContent: React.FC = () => {
         <Header onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
 
         {/* Content Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        {/* Extra bottom padding on phones so content isn't hidden behind the tab bar */}
+        <main className="flex-1 p-4 pb-28 sm:p-6 sm:pb-28 lg:p-8 lg:pb-8 max-w-7xl w-full mx-auto">
+          <PageBreadcrumb />
+          {activeTab === 'dashboard' && <GettingStarted />}
+          {SAMPLE_DATA_PAGES[activeTab] && (
+            <SampleDataNotice className="mb-5">{SAMPLE_DATA_PAGES[activeTab]}</SampleDataNotice>
+          )}
           <ErrorBoundary>
             {renderActiveView()}
           </ErrorBoundary>
         </main>
       </div>
+
+      {/* Bottom tab bar (phones only) */}
+      <MobileTabBar onOpenMenu={() => setIsMobileMenuOpen(true)} />
 
       {/* Global Interactive Modals */}
       <DailyBriefingModal />

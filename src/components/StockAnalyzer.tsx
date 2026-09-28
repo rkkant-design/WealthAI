@@ -32,19 +32,21 @@ import {
 import { useWealth } from '../context/WealthContext';
 
 export const StockAnalyzer: React.FC = () => {
-  const { 
-    stocks, 
-    selectedStock, 
-    setSelectedStockSymbol, 
-    addToWatchlist, 
-    removeFromWatchlist, 
-    isInWatchlist, 
+  const {
+    stocks,
+    selectedStock,
+    setSelectedStockSymbol,
+    addToWatchlist,
+    removeFromWatchlist,
+    isInWatchlist,
     setIsAddInvestmentOpen,
     openEvidenceModal,
     portfolioStats,
     isFetchingLiveQuote,
-    fetchLiveQuote
+    fetchLiveQuote,
+    investorProfile
   } = useWealth();
+  const firstName = (investorProfile.name || 'Investor').split(' ')[0];
 
   const [financialMetric, setFinancialMetric] = useState<'revenue' | 'profit' | 'eps' | 'roce' | 'fcf' | 'operatingMargin'>('revenue');
   const [chartViewMode, setChartViewMode] = useState<'financials' | 'priceHistory'>('financials');
@@ -229,18 +231,41 @@ export const StockAnalyzer: React.FC = () => {
               </div>
             </div>
 
-            {/* Live Exchange provenance and refresh status */}
+            {/* Data provenance — price vs AI-estimated analysis are labelled separately */}
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/40 border border-emerald-500/30 text-emerald-300">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span>Live {currentStock.exchange || 'NSE'} Feed</span>
-                {currentStock.lastUpdatedTime && (
-                  <span className="text-slate-400 text-[10px] font-mono">({currentStock.lastUpdatedTime})</span>
-                )}
-              </div>
+              {currentStock.isLiveExchangeData ? (
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/40 border border-emerald-500/30 text-emerald-300" title="Price, 52-week range and history are live market data.">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span>Live {currentStock.exchange || 'NSE'} price</span>
+                  {currentStock.lastUpdatedTime && (
+                    <span className="text-slate-400 text-[10px] font-mono">({currentStock.lastUpdatedTime})</span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-800 border border-slate-700 text-slate-300" title="Not live — a snapshot or placeholder shown until a live quote is fetched.">
+                  <span>Snapshot price — not live</span>
+                </div>
+              )}
+
+              {currentStock.analysisSource && currentStock.analysisSource !== 'curated' && (
+                <div
+                  className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                    currentStock.analysisSource === 'ai_estimate'
+                      ? 'bg-amber-950/40 border-amber-500/30 text-amber-300'
+                      : 'bg-rose-950/40 border-rose-500/30 text-rose-300'
+                  }`}
+                  title="Fundamentals, valuation, scores and recommendations are AI-generated estimates for research/education only — not audited data or investment advice."
+                >
+                  <span>
+                    {currentStock.analysisSource === 'ai_estimate'
+                      ? 'Fundamentals & rating: AI estimate'
+                      : 'Fundamental analysis unavailable'}
+                  </span>
+                </div>
+              )}
 
               <button
                 id="refresh-live-quote-btn"
@@ -386,7 +411,11 @@ export const StockAnalyzer: React.FC = () => {
               <h3 className="font-extrabold text-sm text-white">Composite Wealth Score</h3>
             </div>
             <span className="text-xs font-bold text-cyan-400 bg-cyan-950/40 px-2.5 py-0.5 rounded border border-cyan-500/30">
-              Grade A+
+              Grade {currentStock.wealthScore >= 85 ? 'A+'
+                : currentStock.wealthScore >= 75 ? 'A'
+                : currentStock.wealthScore >= 65 ? 'B+'
+                : currentStock.wealthScore >= 55 ? 'B'
+                : currentStock.wealthScore >= 45 ? 'C' : 'D'}
             </span>
           </div>
 
@@ -404,7 +433,7 @@ export const StockAnalyzer: React.FC = () => {
                   : 'Cautionary / Cyclical Asset'}
               </p>
               <p className="text-slate-400 text-[11px] leading-tight">
-                Evaluated across 9 audited fundamental, valuation, entry, and portfolio fit parameters.
+                Evaluated across 9 fundamental, valuation, entry, and portfolio-fit parameters (AI-estimated).
               </p>
             </div>
           </div>
@@ -424,7 +453,7 @@ export const StockAnalyzer: React.FC = () => {
                 { label: 'Valuation Attractiveness', val: scoreBreakdown.valuation },
                 { label: 'Market Trend & Institutional Support', val: scoreBreakdown.marketTrend },
                 { label: 'Entry Point Timing', val: scoreBreakdown.entryPoint },
-                { label: 'Portfolio Fit for Kamal', val: scoreBreakdown.portfolioFit },
+                { label: `Portfolio Fit for ${firstName}`, val: scoreBreakdown.portfolioFit },
               ].map((factor, idx) => (
                 <div key={idx} className="flex items-center justify-between text-[11px]">
                   <span className="text-slate-400">{factor.label}</span>
@@ -452,7 +481,7 @@ export const StockAnalyzer: React.FC = () => {
               </span>
               <div className="flex items-center gap-2 mt-0.5">
                 <h3 className="font-extrabold text-base text-white">
-                  What Should Kamal Do?
+                  What Should {firstName} Do?
                 </h3>
                 <span
                   className={`text-xs font-black px-3 py-0.5 rounded-full border ${

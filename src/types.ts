@@ -48,6 +48,40 @@ export interface MarketRegime {
   date: string;
 }
 
+/* Live market pulse (from /api/market-pulse, Yahoo Finance) ---------------- */
+
+export interface LiveQuote {
+  symbol: string;
+  name: string;
+  value: number;
+  change: number;
+  changePercent: number;
+  /** Change over roughly the last month, in %. Null when history is unavailable. */
+  change1mPercent: number | null;
+  prefix?: string;
+  suffix?: string;
+  description?: string;
+}
+
+/** A market reading calculated from live data with simple, disclosed rules. */
+export interface LiveMarketRegime {
+  trend: 'Uptrend' | 'Sideways' | 'Downtrend';
+  trendDetail: string;
+  volatility: 'Low' | 'Normal' | 'High' | 'Unknown';
+  vix: number | null;
+  breadth: 'Positive' | 'Mixed' | 'Negative' | 'Unknown';
+  sectorsUp: number;
+  sectorsTotal: number;
+  summary: string;
+}
+
+export interface MarketPulse {
+  asOf: string;
+  global: LiveQuote[];
+  sectors: LiveQuote[];
+  regime: LiveMarketRegime | null;
+}
+
 export interface MacroIndicator {
   category: 'economic' | 'global';
   name: string;
@@ -104,6 +138,9 @@ export interface Stock {
   wealthScore: number;
   isPennyStock?: boolean;
   isLiveExchangeData?: boolean;
+  // Where the fundamental/valuation analysis came from. Price fields may be live
+  // (isLiveExchangeData) while the analysis is an AI estimate — never conflate them.
+  analysisSource?: 'ai_estimate' | 'unavailable' | 'curated';
   exchange?: 'NSE' | 'BSE';
   lastUpdatedTime?: string;
   pennyStockWarning?: string;
@@ -253,16 +290,6 @@ export interface AuthUser {
   isGoogleUser: boolean;
   loginTime: string;
   riskProfile?: 'Low' | 'Medium' | 'High';
-}
-
-export interface RegisteredAccount {
-  id: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  riskProfile: 'Low' | 'Medium' | 'High';
-  createdAt: string;
-  lastLogin: string;
 }
 
 export interface CopilotMessage {

@@ -1,18 +1,30 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  Firestore, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  getDocs 
+import {
+  getFirestore,
+  Firestore,
+  doc,
+  setDoc,
+  getDoc,
 } from 'firebase/firestore';
+import {
+  getAuth,
+  Auth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  sendPasswordResetEmail,
+  onAuthStateChanged,
+  User,
+} from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { PortfolioItem, InvestorProfile, WatchlistItem, RegisteredAccount } from '../types';
+import { PortfolioItem, InvestorProfile, WatchlistItem } from '../types';
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
+let auth: Auth | null = null;
 
 try {
   if (!getApps().length) {
@@ -26,29 +38,126 @@ try {
     : undefined;
 
   db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+  auth = getAuth(app);
 } catch (error) {
   console.warn('Firebase initialization notice:', error);
 }
 
-export { app, db };
+export { app, db, auth };
 
-// Helper to normalize email for Firestore document IDs
-export const normalizeEmailDocId = (email: string): string => {
-  return email.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
-};
+/* -------------------------------------------------------------------------- */
+/* Authentication                                                              */
+/*                                                                            */
+/* All auth goes through Firebase Authentication. Firebase securely hashes    */
+/* passwords server-side; we NEVER store or compare passwords ourselves.      */
+/* -------------------------------------------------------------------------- */
 
-/**
- * Save user portfolio to Firestore Cloud Database
- */
-export async function savePortfolioToFirestore(email: string, portfolio: PortfolioItem[]): Promise<boolean> {
-  if (!db || !email) return false;
+export interface AuthResult {
+  success: boolean;
+  user?: User;
+  error?: string;
+}
+
+// Map Firebase auth error codes to friendly messages.
+function friendlyAuthError(code: string): string {
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Please contact support.';
+    case 'auth/user-not-found':
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+      return 'Incorrect email or password.';
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists. Please sign in.';
+    case 'auth/weak-password':
+      return 'Password is too weak. Use at least 6 characters.';
+    case 'auth/popup-closed-by-user':
+      return 'Google sign-in was cancelled.';
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the Google sign-in popup. Please allow popups and retry.';
+    case 'auth/network-request-failed':
+      return 'Network error. Please check your connection and try again.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.';
+    default:
+      return 'Authentication failed. Please try again.';
+  }
+}
+
+export async function signUpWithEmail(name: string, email: string, password: string): Promise<AuthResult> {
+  if (!auth) return { success: false, error: 'Authentication is not available right now.' };
   try {
-    const docId = normalizeEmailDocId(email);
-    const userRef = doc(db, 'users', docId);
-    await setDoc(userRef, {
-      email: email.trim().toLowerCase(),
+    const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    if (name.trim()) {
+      await updateProfile(cred.user, { displayName: name.trim() });
+    }
+    return { success: true, user: cred.user };
+  } catch (err: any) {
+    return { success: false, error: friendlyAuthError(err?.code || '') };
+  }
+}
+
+export async function signInWithEmail(email: string, password: string): Promise<AuthResult> {
+  if (!auth) return { success: false, error: 'Authentication is not available right now.' };
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+    return { success: true, user: cred.user };
+  } catch (err: any) {
+    return { success: false, error: friendlyAuthError(err?.code || '') };
+  }
+}
+
+export async function signInWithGoogle(): Promise<AuthResult> {
+  if (!auth) return { success: false, error: 'Authentication is not available right now.' };
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await signInWithPopup(auth, provider);
+    return { success: true, user: cred.user };
+  } catch (err: any) {
+    return { success: false, error: friendlyAuthError(err?.code || '') };
+  }
+}
+
+export async function resetPassword(email: string): Promise<AuthResult> {
+  if (!auth) return { success: false, error: 'Authentication is not available right now.' };
+  try {
+    await sendPasswordResetEmail(auth, email.trim());
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: friendlyAuthError(err?.code || '') };
+  }
+}
+
+export async function signOutUser(): Promise<void> {
+  if (!auth) return;
+  try {
+    await signOut(auth);
+  } catch (err) {
+    console.warn('Sign out notice:', err);
+  }
+}
+
+export function subscribeToAuth(callback: (user: User | null) => void): () => void {
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  return onAuthStateChanged(auth, callback);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Per-user cloud data (keyed by Firebase uid, protected by Firestore rules)   */
+/* -------------------------------------------------------------------------- */
+
+export async function savePortfolioToFirestore(uid: string, portfolio: PortfolioItem[]): Promise<boolean> {
+  if (!db || !uid) return false;
+  try {
+    await setDoc(doc(db, 'users', uid), {
       portfolio,
-      lastSyncedAt: new Date().toISOString()
+      lastSyncedAt: new Date().toISOString(),
     }, { merge: true });
     return true;
   } catch (error) {
@@ -57,20 +166,13 @@ export async function savePortfolioToFirestore(email: string, portfolio: Portfol
   }
 }
 
-/**
- * Load user portfolio from Firestore Cloud Database
- */
-export async function loadPortfolioFromFirestore(email: string): Promise<PortfolioItem[] | null> {
-  if (!db || !email) return null;
+export async function loadPortfolioFromFirestore(uid: string): Promise<PortfolioItem[] | null> {
+  if (!db || !uid) return null;
   try {
-    const docId = normalizeEmailDocId(email);
-    const userRef = doc(db, 'users', docId);
-    const snap = await getDoc(userRef);
+    const snap = await getDoc(doc(db, 'users', uid));
     if (snap.exists()) {
       const data = snap.data();
-      if (Array.isArray(data.portfolio)) {
-        return data.portfolio as PortfolioItem[];
-      }
+      if (Array.isArray(data.portfolio)) return data.portfolio as PortfolioItem[];
     }
     return null;
   } catch (error) {
@@ -79,17 +181,12 @@ export async function loadPortfolioFromFirestore(email: string): Promise<Portfol
   }
 }
 
-/**
- * Save user investor profile to Firestore Cloud Database
- */
-export async function saveProfileToFirestore(email: string, profile: InvestorProfile): Promise<boolean> {
-  if (!db || !email) return false;
+export async function saveProfileToFirestore(uid: string, profile: InvestorProfile): Promise<boolean> {
+  if (!db || !uid) return false;
   try {
-    const docId = normalizeEmailDocId(email);
-    const userRef = doc(db, 'users', docId);
-    await setDoc(userRef, {
+    await setDoc(doc(db, 'users', uid), {
       profile,
-      lastSyncedAt: new Date().toISOString()
+      lastSyncedAt: new Date().toISOString(),
     }, { merge: true });
     return true;
   } catch (error) {
@@ -98,20 +195,13 @@ export async function saveProfileToFirestore(email: string, profile: InvestorPro
   }
 }
 
-/**
- * Load user investor profile from Firestore Cloud Database
- */
-export async function loadProfileFromFirestore(email: string): Promise<InvestorProfile | null> {
-  if (!db || !email) return null;
+export async function loadProfileFromFirestore(uid: string): Promise<InvestorProfile | null> {
+  if (!db || !uid) return null;
   try {
-    const docId = normalizeEmailDocId(email);
-    const userRef = doc(db, 'users', docId);
-    const snap = await getDoc(userRef);
+    const snap = await getDoc(doc(db, 'users', uid));
     if (snap.exists()) {
       const data = snap.data();
-      if (data.profile) {
-        return data.profile as InvestorProfile;
-      }
+      if (data.profile) return data.profile as InvestorProfile;
     }
     return null;
   } catch (error) {
@@ -120,17 +210,12 @@ export async function loadProfileFromFirestore(email: string): Promise<InvestorP
   }
 }
 
-/**
- * Save user watchlist to Firestore Cloud Database
- */
-export async function saveWatchlistToFirestore(email: string, watchlist: WatchlistItem[]): Promise<boolean> {
-  if (!db || !email) return false;
+export async function saveWatchlistToFirestore(uid: string, watchlist: WatchlistItem[]): Promise<boolean> {
+  if (!db || !uid) return false;
   try {
-    const docId = normalizeEmailDocId(email);
-    const userRef = doc(db, 'users', docId);
-    await setDoc(userRef, {
+    await setDoc(doc(db, 'users', uid), {
       watchlist,
-      lastSyncedAt: new Date().toISOString()
+      lastSyncedAt: new Date().toISOString(),
     }, { merge: true });
     return true;
   } catch (error) {
@@ -139,65 +224,17 @@ export async function saveWatchlistToFirestore(email: string, watchlist: Watchli
   }
 }
 
-/**
- * Load user watchlist from Firestore Cloud Database
- */
-export async function loadWatchlistFromFirestore(email: string): Promise<WatchlistItem[] | null> {
-  if (!db || !email) return null;
+export async function loadWatchlistFromFirestore(uid: string): Promise<WatchlistItem[] | null> {
+  if (!db || !uid) return null;
   try {
-    const docId = normalizeEmailDocId(email);
-    const userRef = doc(db, 'users', docId);
-    const snap = await getDoc(userRef);
+    const snap = await getDoc(doc(db, 'users', uid));
     if (snap.exists()) {
       const data = snap.data();
-      if (Array.isArray(data.watchlist)) {
-        return data.watchlist as WatchlistItem[];
-      }
+      if (Array.isArray(data.watchlist)) return data.watchlist as WatchlistItem[];
     }
     return null;
   } catch (error) {
     console.error('Error loading watchlist from Firestore:', error);
-    return null;
-  }
-}
-
-/**
- * Save registered account to Firestore
- */
-export async function saveAccountToFirestore(account: RegisteredAccount): Promise<boolean> {
-  if (!db) return false;
-  try {
-    const docId = normalizeEmailDocId(account.email);
-    const accountRef = doc(db, 'accounts', docId);
-    await setDoc(accountRef, {
-      ...account,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-    return true;
-  } catch (error) {
-    console.error('Error saving account to Firestore:', error);
-    return false;
-  }
-}
-
-/**
- * Load all registered accounts from Firestore
- */
-export async function loadAccountsFromFirestore(): Promise<RegisteredAccount[] | null> {
-  if (!db) return null;
-  try {
-    const colRef = collection(db, 'accounts');
-    const snap = await getDocs(colRef);
-    if (!snap.empty) {
-      const list: RegisteredAccount[] = [];
-      snap.forEach((d) => {
-        list.push(d.data() as RegisteredAccount);
-      });
-      return list;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error loading accounts from Firestore:', error);
     return null;
   }
 }

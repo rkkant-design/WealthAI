@@ -18,8 +18,14 @@ router.get("/stock-quote", async (req, res) => {
       });
     }
 
+    // Honest labelling: the PRICE is a live exchange feed, but the fundamental
+    // analysis is an AI estimate (or unavailable). Do not conflate the two.
     return res.json({
-      source: "live_exchange_feed",
+      source: "live_price_feed",
+      priceSource: "yahoo_finance_live",
+      analysisSource: result.stock.analysisSource || "ai_estimate",
+      disclaimer:
+        "Price, 52-week range and history are live market data. Fundamentals, valuation, scores and recommendations are AI-generated estimates for research/education only — not audited data or investment advice.",
       exchange: result.exchange,
       symbol: result.baseSymbol,
       ticker: result.matchedSymbol,

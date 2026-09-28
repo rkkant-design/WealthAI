@@ -32,12 +32,12 @@ export const DailyBriefingModal: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-base text-white tracking-tight">Your 60-Second Market Brief</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                  Daily AI Executive
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Illustrative sample
                 </span>
               </div>
               <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <Clock className="h-3 w-3" /> Market Regime: Cautiously Positive (84% Confidence)
+                <Clock className="h-3 w-3" /> Sample daily brief — illustrative content, not live market commentary
               </p>
             </div>
           </div>

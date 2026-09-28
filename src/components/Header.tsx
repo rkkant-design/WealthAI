@@ -29,8 +29,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
   const { 
     stocks, 
     setSelectedStockSymbol, 
-    marketRegime, 
-    setIsDailyBriefingOpen, 
+    marketDataLive,
+    setIsDailyBriefingOpen,
     setIsAddInvestmentOpen,
     unreadAlertCount,
     setActiveTab,
@@ -47,7 +47,22 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Press "/" anywhere (outside a text field) to jump to stock search.
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (event.key === '/' && !isTyping) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleShortcut);
+    return () => document.removeEventListener('keydown', handleShortcut);
+  }, []);
 
   // Close search and user menu on click outside
   useEffect(() => {
@@ -112,10 +127,20 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono text-[10px] font-bold flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-            Live NSE/BSE Market Data Connected
-          </span>
+          {marketDataLive ? (
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono text-[10px] font-bold flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+              Live market data connected
+            </span>
+          ) : (
+            <span
+              title="The live market feed hasn't responded yet. Index figures may be sample values."
+              className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 font-mono text-[10px] font-bold flex items-center gap-1.5"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              Live data unavailable
+            </span>
+          )}
         </div>
       </div>
 
@@ -126,24 +151,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <button
             id="mobile-menu-toggle"
             onClick={onToggleMobileMenu}
+            aria-label="Open menu"
             className="lg:hidden p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Quick Market Regime Pill */}
-          <button
-            id="header-regime-pill"
-            onClick={() => setActiveTab('market')}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 transition-all text-xs font-semibold"
-          >
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-slate-400 text-[11px]">Regime:</span>
-            <span className="text-emerald-300 font-bold">{marketRegime.status}</span>
-            <span className="text-slate-400 font-mono text-[10px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">
-              {marketRegime.confidence}%
-            </span>
-          </button>
         </div>
 
         {/* Global Search Bar */}
@@ -151,9 +164,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
+              ref={searchInputRef}
               id="global-stock-search-input"
               type="text"
-              placeholder="Search NSE stock quote (e.g. INFY, SBIN, ITC, Tata Motors)..."
+              aria-label="Search stocks"
+              placeholder="Search any stock, e.g. INFY or Tata Motors"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -161,8 +176,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
               }}
               onFocus={() => setIsSearchOpen(true)}
               onKeyDown={handleKeyDown}
-              className="w-full pl-9 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
+              className="w-full pl-9 pr-8 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
             />
+            {!searchQuery && (
+              <kbd className="hidden md:block absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-slate-400 pointer-events-none">
+                /
+              </kbd>
+            )}
             {searchQuery && (
               <button
                 type="button"
@@ -188,6 +208,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
                 <span className="text-[10px] text-slate-400 hidden sm:inline">
                   Press <kbd className="px-1 py-0.5 bg-slate-800 rounded text-slate-300 font-mono text-[9px] border border-slate-700">Enter ↵</kbd> to analyze
                 </span>
+              </div>
+              <div className="px-2.5 py-1.5 bg-amber-500/5 border-b border-slate-800 text-[10px] text-amber-300/90">
+                Prices in this list may be out of date. Open a stock to see its live price.
               </div>
 
               {/* Popular Benchmark Pills if query is empty */}
@@ -234,7 +257,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-400 group-hover:text-blue-100 mt-0.5">
-                        Fetches live exchange prices, audited financials, institutional valuation, and penny stock/microcap risk checks
+                        Fetches live exchange prices, plus AI-estimated fundamentals, valuation and penny stock/microcap risk checks
                       </p>
                     </div>
                     <span className="px-2 py-1 rounded bg-blue-500/20 text-blue-300 group-hover:bg-white group-hover:text-blue-900 text-[10px] font-bold font-mono">
@@ -331,7 +354,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <button
             id="header-alerts-button"
             onClick={() => setActiveTab('alerts')}
-            className="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white transition-colors"
+            aria-label="Alerts"
+            className="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
           >
             <Bell className="h-4 w-4" />
             {unreadAlertCount > 0 && (
@@ -346,7 +370,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
             id="header-cloud-sync-btn"
             onClick={() => syncWithCloud()}
             title={`Cloud Database: ${cloudSyncStatus === 'synced' ? 'Synced at ' + (lastSyncedTime || 'recently') : cloudSyncStatus}. Click to sync now.`}
-            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-300 text-xs transition-colors group"
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs transition-colors group"
           >
             <Cloud className={`h-3.5 w-3.5 transition-colors ${
               cloudSyncStatus === 'synced' 
@@ -365,7 +389,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
             <button
               id="header-user-menu-btn"
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-left transition-all"
+              className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition-all"
               title={user?.email || 'User Account'}
             >
               <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">

@@ -17,17 +17,17 @@ import {
   Check
 } from 'lucide-react';
 import { useWealth } from '../context/WealthContext';
+import { resetPassword } from '../lib/firebase';
 
 interface LoginScreenProps {
   onBackToHome?: () => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
-  const { 
-    loginWithCredentials, 
-    registerAccount, 
-    loginWithGmail, 
-    registeredAccounts,
+  const {
+    loginWithCredentials,
+    registerAccount,
+    loginWithGoogle,
     setAuthView
   } = useWealth();
 
@@ -35,8 +35,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
 
   // Form inputs
-  const [email, setEmail] = useState('rkkant@gmail.com');
-  const [password, setPassword] = useState('WealthPilot@2026');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [riskProfile, setRiskProfile] = useState<'Low' | 'Medium' | 'High'>('Medium');
@@ -61,7 +61,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
 
   const passwordStrength = getPasswordStrength(password);
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -77,17 +77,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
     }
 
     setIsLoading(true);
-
-    setTimeout(() => {
-      const result = loginWithCredentials(email.trim(), password, startFresh);
-      setIsLoading(false);
-      if (!result.success) {
-        setErrorMessage(result.error || 'Authentication failed. Please check your credentials.');
-      }
-    }, 400);
+    const result = await loginWithCredentials(email.trim(), password, startFresh);
+    setIsLoading(false);
+    if (!result.success) {
+      setErrorMessage(result.error || 'Authentication failed. Please check your credentials.');
+    }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -113,38 +110,40 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
     }
 
     setIsLoading(true);
-
-    setTimeout(() => {
-      const result = registerAccount(name.trim(), email.trim(), password, riskProfile, startFresh);
-      setIsLoading(false);
-      if (!result.success) {
-        setErrorMessage(result.error || 'Registration failed.');
-      }
-    }, 500);
+    const result = await registerAccount(name.trim(), email.trim(), password, riskProfile, startFresh);
+    setIsLoading(false);
+    if (!result.success) {
+      setErrorMessage(result.error || 'Registration failed.');
+    }
   };
 
-  const handleGoogleLogin = (targetEmail: string = email) => {
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
     setErrorMessage(null);
-    setTimeout(() => {
-      const derivedName = targetEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-      loginWithGmail(targetEmail, derivedName || 'Investor', startFresh);
-      setIsLoading(false);
-    }, 450);
+    const result = await loginWithGoogle(startFresh);
+    setIsLoading(false);
+    if (!result.success) {
+      setErrorMessage(result.error || 'Google sign-in failed. Please try again.');
+    }
   };
 
-  const handleForgotPassword = (e: React.FormEvent) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
     if (!email.trim()) {
       setErrorMessage('Please enter your registered email address.');
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setSuccessMessage(`Password recovery instructions have been dispatched to ${email}. For instant testing, you can use the default password: WealthPilot@2026`);
-    }, 600);
+    const result = await resetPassword(email.trim());
+    setIsLoading(false);
+    if (result.success) {
+      setSuccessMessage(`If an account exists for ${email.trim()}, a secure password reset link has been sent to that inbox.`);
+    } else {
+      setErrorMessage(result.error || 'Could not send the reset email. Please try again.');
+    }
   };
 
   const navigateHome = () => {
@@ -264,7 +263,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="rkkant@gmail.com"
+                    placeholder="you@example.com"
                     required
                     className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
                   />
@@ -367,7 +366,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
               <button
                 id="signin-google-btn"
                 type="button"
-                onClick={() => handleGoogleLogin(email || 'rkkant@gmail.com')}
+                onClick={handleGoogleLogin}
                 disabled={isLoading}
                 className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-200 font-semibold text-xs transition-all shadow-sm"
               >
@@ -379,25 +378,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
                 </svg>
                 <span>Continue with Google</span>
               </button>
-
-              {/* 1-Click Demo Profile Banner */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
-                <div className="min-w-0">
-                  <span className="text-[11px] font-bold text-white block truncate">Verified Test Account</span>
-                  <span className="text-[10px] text-slate-400 block truncate">rkkant@gmail.com</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('rkkant@gmail.com');
-                    setPassword('WealthPilot@2026');
-                    loginWithCredentials('rkkant@gmail.com', 'WealthPilot@2026', startFresh);
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold text-[11px] border border-emerald-500/30 transition-colors"
-                >
-                  Quick Launch →
-                </button>
-              </div>
             </form>
           )}
 
@@ -416,7 +396,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. RK Kant"
+                    placeholder="Your full name"
                     required
                     className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
                   />
@@ -592,7 +572,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBackToHome }) => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="rkkant@gmail.com"
+                    placeholder="you@example.com"
                     required
                     className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
                   />

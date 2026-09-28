@@ -1,7 +1,23 @@
 # WealthPilot AI 🚀
 ### Enterprise-Grade NSE & BSE Investment Intelligence & Portfolio Copilot
 
-WealthPilot AI is an AI-powered personal equity investment intelligence platform built specifically for long-term Indian retail and high-net-worth investors. It combines real-time NSE/BSE market data, institutional-grade fundamental valuation models (9-Factor Wealth Score), automated portfolio risk & concentration auditing, and a Gemini-powered investment copilot.
+WealthPilot AI is an AI-powered personal equity research tool for long-term Indian
+investors. It combines **live NSE/BSE prices** (Yahoo Finance), **AI-generated**
+fundamental analysis (9-Factor Wealth Score), portfolio risk & concentration
+auditing, and a Gemini-powered investment copilot.
+
+---
+
+## ⚠️ Data & Disclaimers (read this)
+
+- **Prices, 52-week ranges and history are live** market data.
+- **Fundamentals, valuation, scores and recommendations are AI-generated
+  estimates** for research/education only — *not* audited financials and *not*
+  investment advice. They are labelled in the UI (`AI estimate`) and API
+  (`analysisSource`). When the AI is unavailable, the app shows an "unavailable"
+  state rather than inventing company-specific numbers.
+- WealthPilot AI is **not a SEBI-registered investment adviser**. Consult a
+  qualified adviser before investing.
 
 ---
 
@@ -16,7 +32,7 @@ WealthPilot AI is an AI-powered personal equity investment intelligence platform
    - Evaluates fundamental business quality, return on capital (ROCE / ROE), balance sheet leverage, and cash flow generation.
    - Computes fair-value estimates, preferred entry zones, and margin-of-safety discounts.
 
-3. **Gemini 2.5 Flash Investment Copilot**:
+3. **Gemini Investment Copilot** (model configurable via `GEMINI_MODEL`, default `gemini-3.8-flash`):
    - Grounded in disciplined long-term wealth accumulation principles (5–20 year retirement horizon).
    - Provides reasoned thesis breakdowns, margin-of-safety checks, and "what would change the recommendation" contrarian stress tests.
 
@@ -86,7 +102,17 @@ Inside `.env`:
 ```env
 PORT=3000
 GEMINI_API_KEY="your-google-gemini-api-key"
+GEMINI_MODEL="gemini-3.8-flash"
 ```
+
+You must also fill `firebase-applet-config.json` with your Firebase **web app**
+config and enable Email/Password + Google sign-in in the Firebase console.
+
+**Authentication & security:** WealthPilot AI uses **Firebase Authentication**
+(email/password + Google OAuth). The app never stores or handles raw passwords,
+and per-user data is protected by `firestore.rules` (`users/{uid}` accessible
+only to that authenticated user). See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for
+the full production setup (Firebase, Firestore rules, Cloud Run, secrets).
 
 ### 4. Run Development Server
 ```bash

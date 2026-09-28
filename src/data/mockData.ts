@@ -12,7 +12,7 @@ import {
 } from '../types';
 
 export const initialInvestorProfile: InvestorProfile = {
-  name: 'Kamal',
+  name: 'Investor',
   market: 'NSE India only',
   riskProfile: 'Medium',
   investmentHorizon: 'Long Term (10–20 Years)',

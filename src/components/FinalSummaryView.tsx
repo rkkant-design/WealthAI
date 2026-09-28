@@ -16,13 +16,14 @@ import {
 import { useWealth } from '../context/WealthContext';
 
 export const FinalSummaryView: React.FC = () => {
-  const { setActiveTab } = useWealth();
+  const { setActiveTab, investorProfile } = useWealth();
+  const firstName = (investorProfile.name || 'Investor').split(' ')[0];
 
   const engineFlow = [
     {
       step: '1',
       title: 'Investor Profile',
-      subtitle: 'Kamal • Medium Risk • ₹15K/mo',
+      subtitle: `${firstName} • ${investorProfile.riskProfile} Risk • ₹${Math.round(investorProfile.monthlyBudget / 1000)}K/mo`,
       desc: 'Grounding every calculation in personal constraints, time horizon, and retirement goals.',
       icon: User,
       color: 'from-blue-600 to-indigo-600',

@@ -47,7 +47,22 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Press "/" anywhere (outside a text field) to jump to stock search.
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (event.key === '/' && !isTyping) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleShortcut);
+    return () => document.removeEventListener('keydown', handleShortcut);
+  }, []);
 
   // Close search and user menu on click outside
   useEffect(() => {
@@ -126,6 +141,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <button
             id="mobile-menu-toggle"
             onClick={onToggleMobileMenu}
+            aria-label="Open menu"
             className="lg:hidden p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
           >
             <Menu className="h-5 w-5" />
@@ -151,9 +167,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
+              ref={searchInputRef}
               id="global-stock-search-input"
               type="text"
-              placeholder="Search NSE stock quote (e.g. INFY, SBIN, ITC, Tata Motors)..."
+              aria-label="Search stocks"
+              placeholder="Search any stock, e.g. INFY or Tata Motors"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -161,8 +179,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
               }}
               onFocus={() => setIsSearchOpen(true)}
               onKeyDown={handleKeyDown}
-              className="w-full pl-9 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
+              className="w-full pl-9 pr-8 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
             />
+            {!searchQuery && (
+              <kbd className="hidden md:block absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-slate-400 pointer-events-none">
+                /
+              </kbd>
+            )}
             {searchQuery && (
               <button
                 type="button"
@@ -331,7 +354,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <button
             id="header-alerts-button"
             onClick={() => setActiveTab('alerts')}
-            className="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white transition-colors"
+            aria-label="Alerts"
+            className="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
           >
             <Bell className="h-4 w-4" />
             {unreadAlertCount > 0 && (
@@ -346,7 +370,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
             id="header-cloud-sync-btn"
             onClick={() => syncWithCloud()}
             title={`Cloud Database: ${cloudSyncStatus === 'synced' ? 'Synced at ' + (lastSyncedTime || 'recently') : cloudSyncStatus}. Click to sync now.`}
-            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-300 text-xs transition-colors group"
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs transition-colors group"
           >
             <Cloud className={`h-3.5 w-3.5 transition-colors ${
               cloudSyncStatus === 'synced' 
@@ -365,7 +389,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
             <button
               id="header-user-menu-btn"
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-left transition-all"
+              className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition-all"
               title={user?.email || 'User Account'}
             >
               <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-emerald-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">

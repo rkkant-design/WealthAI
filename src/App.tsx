@@ -11,8 +11,6 @@ import { SampleDataNotice } from './components/SampleDataNotice';
 // Pages whose content is still fixed example data (not live, not personalised).
 // Remove an entry once that page is wired to a real source.
 const SAMPLE_DATA_PAGES: Record<string, string> = {
-  sectors:
-    'Sector scores, valuations and outlooks on this page are fixed examples. They are not updated and may be out of date.',
   opportunities:
     'This list, its prices, scores and actions come from a fixed example dataset, not live prices. Open a stock in the Stock Analyzer to see its live price.',
   plan:

@@ -10,9 +10,11 @@ import {
   Search
 } from 'lucide-react';
 import { useWealth } from '../context/WealthContext';
+import { SampleDataNotice } from './SampleDataNotice';
+import { LiveBadge, SectorPerformanceTable, PulseLoading, PulseError } from './LiveMarketWidgets';
 
 export const SectorIntelligence: React.FC = () => {
-  const { sectors, setSelectedStockSymbol, setActiveTab } = useWealth();
+  const { sectors, setSelectedStockSymbol, setActiveTab, marketPulse, marketPulseStatus } = useWealth();
   const [outlookFilter, setOutlookFilter] = useState<'All' | 'Positive' | 'Neutral' | 'Cautious'>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -99,6 +101,33 @@ export const SectorIntelligence: React.FC = () => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Live sector performance (NSE sectoral indices) */}
+      {marketPulse && marketPulse.sectors.length > 0 ? (
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div>
+              <h2 className="font-extrabold text-sm text-white">Sector performance</h2>
+              <p className="text-xs text-slate-400">NSE sector indices, ranked by today's move</p>
+            </div>
+            <LiveBadge asOf={marketPulse.asOf} />
+          </div>
+          <SectorPerformanceTable sectors={marketPulse.sectors} />
+        </div>
+      ) : marketPulseStatus === 'loading' ? (
+        <PulseLoading text="Loading live sector performance…" />
+      ) : (
+        <PulseError />
+      )}
+
+      {/* Sector profiles (still sample data) */}
+      <div className="space-y-3">
+        <h2 className="font-extrabold text-base text-white">Sector profiles</h2>
+        <SampleDataNotice>
+          The outlook, valuation, momentum and risk ratings in these cards are fixed examples, not calculated from
+          live data. Use the live table above for how sectors are actually moving.
+        </SampleDataNotice>
       </div>
 
       {/* Sector Cards Grid */}

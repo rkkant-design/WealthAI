@@ -31,6 +31,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/market-pulse"
+  to = "/.netlify/functions/market-pulse"
+  status = 200
+
+[[redirects]]
   from = "/api/copilot"
   to = "/.netlify/functions/copilot"
   status = 200

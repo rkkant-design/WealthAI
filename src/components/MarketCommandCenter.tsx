@@ -17,12 +17,83 @@ import {
 } from 'lucide-react';
 import { useWealth } from '../context/WealthContext';
 import { SampleDataNotice, SampleBadge } from './SampleDataNotice';
+import { LiveBadge, formatQuoteValue } from './LiveMarketWidgets';
+import { MarketPulse } from '../types';
+
+const TONE: Record<string, string> = {
+  Uptrend: 'text-emerald-400',
+  Positive: 'text-emerald-400',
+  Low: 'text-emerald-400',
+  Sideways: 'text-slate-200',
+  Mixed: 'text-slate-200',
+  Normal: 'text-slate-200',
+  Downtrend: 'text-rose-400',
+  Negative: 'text-rose-400',
+  High: 'text-amber-400',
+  Unknown: 'text-slate-500',
+};
+
+/** Market reading calculated from live data (see server/services/marketPulseService.ts for the rules). */
+const LiveRegimePanel: React.FC<{ pulse: MarketPulse; onOpenMarket: () => void }> = ({ pulse, onOpenMarket }) => {
+  const regime = pulse.regime!;
+  const usdInr = pulse.global.find((q) => q.symbol === 'INR=X');
+  const brent = pulse.global.find((q) => q.symbol === 'BZ=F');
+
+  const tiles: { label: string; value: string; tone: string }[] = [
+    { label: 'Trend', value: regime.trend, tone: TONE[regime.trend] },
+    { label: 'Volatility', value: regime.vix !== null ? `${regime.volatility} (VIX ${regime.vix})` : regime.volatility, tone: TONE[regime.volatility] },
+    { label: 'Sectors up today', value: `${regime.sectorsUp} of ${regime.sectorsTotal}`, tone: TONE[regime.breadth] },
+  ];
+  if (usdInr) tiles.push({ label: 'USD / INR', value: formatQuoteValue(usdInr), tone: 'text-slate-200' });
+  if (brent) tiles.push({ label: 'Brent crude', value: formatQuoteValue(brent), tone: 'text-slate-200' });
+
+  return (
+    <div className="lg:col-span-2 p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            Market today <LiveBadge asOf={pulse.asOf} />
+          </span>
+          <h2 className={`text-xl sm:text-2xl font-black mt-1 ${TONE[regime.trend]}`}>
+            {regime.trend === 'Uptrend' ? 'Uptrend' : regime.trend === 'Downtrend' ? 'Downtrend' : 'Moving sideways'}
+          </h2>
+        </div>
+        <button
+          id="view-market-analysis-btn"
+          onClick={onOpenMarket}
+          className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+        >
+          <span>View Market Analysis</span>
+          <ArrowRight className="h-3.5 w-3.5 text-blue-400" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center text-xs">
+        {tiles.map((t) => (
+          <div key={t.label} className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <span className="text-[10px] text-slate-400 block">{t.label}</span>
+            <span className={`font-bold font-mono ${t.tone}`}>{t.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/40">
+        <p className="text-sm text-slate-300 leading-relaxed">{regime.summary}</p>
+        <p className="text-[11px] text-slate-500 mt-2">
+          Calculated automatically from live prices: trend compares NIFTY 50 with its 50-day average (±2%), volatility
+          uses India VIX, and breadth counts NSE sector indices up today. This describes the market; it is not advice.
+        </p>
+      </div>
+    </div>
+  );
+};
 
 export const MarketCommandCenter: React.FC = () => {
   const {
     investorProfile,
     marketIndices,
     marketDataLive,
+    marketPulse,
     marketRegime,
     portfolioStats, 
     monthlyPlan, 
@@ -158,7 +229,10 @@ export const MarketCommandCenter: React.FC = () => {
 
       {/* Hero Market Regime Section (Section 6) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left 2 Cols: Large Market Regime Hero */}
+        {/* Left 2 Cols: Market reading — live when available, otherwise the labelled sample */}
+        {marketPulse?.regime ? (
+          <LiveRegimePanel pulse={marketPulse} onOpenMarket={() => setActiveTab('market')} />
+        ) : (
         <div className="lg:col-span-2 p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
             <div>
@@ -231,6 +305,7 @@ export const MarketCommandCenter: React.FC = () => {
             </p>
           </div>
         </div>
+        )}
 
         {/* Right Col: Portfolio Health Gauge */}
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between space-y-4 shadow-xl">

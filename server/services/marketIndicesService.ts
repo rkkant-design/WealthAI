@@ -10,6 +10,8 @@ export interface MarketIndex {
 }
 
 export async function getMarketIndicesOverview(): Promise<{
+  /** false when Yahoo failed and `indices` are the hardcoded fallback values. */
+  live: boolean;
   indices: MarketIndex[];
   marketStatus: { isOpen: boolean; sessionMessage: string; timestamp: string };
 }> {
@@ -118,6 +120,7 @@ export async function getMarketIndicesOverview(): Promise<{
 
     if (liveIndices.length > 0) {
       return {
+        live: true,
         indices: liveIndices,
         marketStatus: {
           isOpen: isMarketOpen,
@@ -131,6 +134,7 @@ export async function getMarketIndicesOverview(): Promise<{
   }
 
   return {
+    live: false,
     indices: defaultIndices,
     marketStatus: {
       isOpen: isMarketOpen,

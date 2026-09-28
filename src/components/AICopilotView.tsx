@@ -21,7 +21,7 @@ interface Message {
 }
 
 export const AICopilotView: React.FC = () => {
-  const { investorProfile, portfolio, marketIndices, marketDataLive, portfolioStats } = useWealth();
+  const { investorProfile, portfolio, marketIndices, marketDataLive, marketPulse, portfolioStats } = useWealth();
   const firstName = (investorProfile.name || 'Investor').split(' ')[0];
 
   // Build the greeting from the REAL account state, not a fictional portfolio.
@@ -99,6 +99,10 @@ Ask me anything about stock entry timing, valuation multiples, portfolio risk, o
             // are the fallback sample rather than the live feed.
             marketIndices,
             marketIndicesAreLive: marketDataLive,
+            // Live global factors, sector moves and the rule-based market reading (null if unavailable).
+            liveMarket: marketPulse
+              ? { asOf: marketPulse.asOf, regime: marketPulse.regime, global: marketPulse.global, sectors: marketPulse.sectors }
+              : null,
             portfolioStats,
             history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
           },

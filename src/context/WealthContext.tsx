@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   InvestorProfile, 
   MarketIndex, 
-  MarketRegime, 
+  MarketRegime,
+  MarketPulse,
   MacroIndicator, 
   SectorData, 
   Stock, 
@@ -52,6 +53,9 @@ interface WealthContextType {
   updateInvestorProfile: (profile: Partial<InvestorProfile>) => void;
   marketIndices: MarketIndex[];
   marketDataLive: boolean;
+  /** Live global factors, sector indices and derived regime. Null until loaded. */
+  marketPulse: MarketPulse | null;
+  marketPulseStatus: 'loading' | 'live' | 'error';
   marketRegime: MarketRegime;
   macroIndicators: MacroIndicator[];
   sectors: SectorData[];
@@ -222,6 +226,8 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // until the live fetch resolves; `marketDataLive` tells the UI which it is.
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>(mockMarketIndices);
   const [marketDataLive, setMarketDataLive] = useState<boolean>(false);
+  const [marketPulse, setMarketPulse] = useState<MarketPulse | null>(null);
+  const [marketPulseStatus, setMarketPulseStatus] = useState<'loading' | 'live' | 'error'>('loading');
 
   useEffect(() => {
     let isMounted = true;
@@ -231,6 +237,12 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!res.ok) return;
         const data = await res.json();
         if (!isMounted || !Array.isArray(data.indices) || data.indices.length === 0) return;
+        // The server returns hardcoded fallback indices (live: false) when Yahoo
+        // fails; keep showing our own sample values flagged as sample instead.
+        if (data.live === false) {
+          setMarketDataLive(false);
+          return;
+        }
         const mapped: MarketIndex[] = data.indices.map((b: any) => {
           const sample = mockMarketIndices.find((m) => m.symbol === b.name);
           return {
@@ -251,11 +263,29 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.warn('Market overview fetch fallback:', err);
       }
     };
+    // Live global factors, sector indices and the derived market reading.
+    const loadPulse = async () => {
+      try {
+        const res = await fetch('/api/market-pulse');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data: MarketPulse = await res.json();
+        if (!isMounted) return;
+        setMarketPulse(data);
+        setMarketPulseStatus(data.global.length > 0 || data.sectors.length > 0 ? 'live' : 'error');
+      } catch (err) {
+        console.warn('Market pulse fetch failed:', err);
+        if (isMounted) setMarketPulseStatus((prev) => (prev === 'live' ? 'live' : 'error'));
+      }
+    };
+
     loadOverview();
     const interval = setInterval(loadOverview, 60_000);
+    loadPulse();
+    const pulseInterval = setInterval(loadPulse, 5 * 60_000);
     return () => {
       isMounted = false;
       clearInterval(interval);
+      clearInterval(pulseInterval);
     };
   }, []);
 
@@ -843,6 +873,8 @@ export const WealthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateInvestorProfile,
         marketIndices,
         marketDataLive,
+        marketPulse,
+        marketPulseStatus,
         marketRegime: mockMarketRegime,
         macroIndicators: mockMacroIndicators,
         sectors: mockSectors,

@@ -37,6 +37,8 @@ Both layers are thin wrappers over `server/services/*`, `server/gemini.ts`, and 
 - Prices, 52-week ranges and history are live (Yahoo Finance, `server/services/stockQuoteService.ts`). Day change must use `regularMarketPreviousClose`, not `chartPreviousClose` (the latter is the start of the chart range and produced a bogus −37% day change).
 - Fundamentals, valuation, scores and recommendations are Gemini-generated per company in `stockAnalysisService.ts` and must stay flagged via `analysisSource: 'ai_estimate'`. When Gemini is unavailable the service returns `analysisSource: 'unavailable'` with neutral values — never invent company-specific numbers or reintroduce hardcoded "fundamentals" presented as real.
 - Don't show demo/mock data (`src/data/mockData.ts`) as if it were the user's real portfolio; empty states should reflect the actual account.
+- `/api/market-pulse` (`server/services/marketPulseService.ts`) supplies live global factors, NSE sector indices and a rule-based market reading (NIFTY vs 50-day average, India VIX bands, sector breadth). Failed symbols are omitted, never replaced with sample numbers. `/api/market-overview` returns `live: false` when it falls back to hardcoded indices — the client must not label those as live.
+- Sections still backed by `mockData.ts` (FII/DII flows, Indian macro indicators, sector profile cards, opportunities, monthly plan, action cards, daily brief) must carry `SampleDataNotice` / `SampleBadge` (`src/components/SampleDataNotice.tsx`, plus the `SAMPLE_DATA_PAGES` map in `App.tsx`). Remove the label only when the section is wired to a real source.
 
 ### Frontend
 

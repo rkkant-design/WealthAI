@@ -48,6 +48,40 @@ export interface MarketRegime {
   date: string;
 }
 
+/* Live market pulse (from /api/market-pulse, Yahoo Finance) ---------------- */
+
+export interface LiveQuote {
+  symbol: string;
+  name: string;
+  value: number;
+  change: number;
+  changePercent: number;
+  /** Change over roughly the last month, in %. Null when history is unavailable. */
+  change1mPercent: number | null;
+  prefix?: string;
+  suffix?: string;
+  description?: string;
+}
+
+/** A market reading calculated from live data with simple, disclosed rules. */
+export interface LiveMarketRegime {
+  trend: 'Uptrend' | 'Sideways' | 'Downtrend';
+  trendDetail: string;
+  volatility: 'Low' | 'Normal' | 'High' | 'Unknown';
+  vix: number | null;
+  breadth: 'Positive' | 'Mixed' | 'Negative' | 'Unknown';
+  sectorsUp: number;
+  sectorsTotal: number;
+  summary: string;
+}
+
+export interface MarketPulse {
+  asOf: string;
+  global: LiveQuote[];
+  sectors: LiveQuote[];
+  regime: LiveMarketRegime | null;
+}
+
 export interface MacroIndicator {
   category: 'economic' | 'global';
   name: string;
